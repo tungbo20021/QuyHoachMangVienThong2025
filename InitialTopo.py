@@ -65,7 +65,7 @@ def Global_Init_Topo(MAX,NumNode,DeBug):
 
         print("---------Topology mạng-------------")
         Node.printInitialList(ListPosition)
-        NodesExcel.nodes_to_excel(ListPosition,'nodes_inf.xlsx')
+        # NodesExcel.nodes_to_excel(ListPosition,'nodes_inf.xlsx')
         print("----------Kết thúc tạo topology-------------")
 
     Node.matplotList(ListPosition, MAX)

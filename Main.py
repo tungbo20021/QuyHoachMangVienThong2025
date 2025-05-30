@@ -33,8 +33,8 @@ def main():
     )
     
     # Xuất kết quả ra file (nếu muốn)
-    Mentor_2.write_result('mentor2_result.txt', backbone, link_path_count, link_cost, link_cost_changed, link_usage)
-    print("Đã xuất kết quả Mentor 2 ra mentor2_result.txt")
+    # Mentor_2.write_result('mentor2_result.txt', backbone, link_path_count, link_cost, link_cost_changed, link_usage)
+    # print("Đã xuất kết quả Mentor 2 ra mentor2_result.txt")
 
     # # Đọc liên kết bổ sung từ file
     # direct_links = read_direct_links('mentor2_result.txt', ListPosition)
