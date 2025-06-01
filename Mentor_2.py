@@ -63,7 +63,7 @@ def prim_dijkstra_backbone_links(ListPosition, backbone_nodes,ListMentor,center_
 
     print("=== KẾT THÚC THUẬT TOÁN PRIM-DIJKSTRA ===")
     links = [(node_map[u], node_map[v]) for u, v in tree_edges]
-    plot_backbone(ListPosition,ListMentor, links, MAX,None)
+    plot_backbone(ListPosition,ListMentor, links, MAX,None,None)
 
     return links
 
@@ -226,13 +226,16 @@ def Mentor2_ISP(ListPosition, TrafficMatrix, MAX, C, w, RadiusRatio,NumNode, Lim
                     else:
                         term_hop_list.append((home_node, v, hops_homev, traffic_matrix.at[home_node, v]))
         print("------------------------------------------")
-
-    plot_backbone(ListPosition, ListMentor, backbone_links, MAX, direct_links)
+    print("Xét lưu lượng các kết nối 1 hop:")
+    for u, v, traffic in final_hop_list:
+       n = math.ceil(traffic_matrix.at[u, v] / C)
+       print(f"Cặp backbone {u} - {v}: T({u},{v})={traffic_matrix.at[u, v]}, n = upperbound(T({u},{v})/C)=upperbound({traffic_matrix.at[u,v]}/{C})={n}") 
+    plot_backbone(ListPosition, ListMentor, backbone_links, MAX, direct_links,True)
     print("=== KẾT THÚC TÍNH TOÁN LIÊN KẾT TRỰC TIẾP ===")
     return backbone_names, ListMentor, prim_links, direct_links
 
 
-def plot_backbone(ListPosition, _list_mentor, backbone_links, MAX, direct_links):
+def plot_backbone(ListPosition, _list_mentor, backbone_links, MAX, direct_links,done):
     colors = ['red', 'blue', 'green', 'orange', 'purple', 'magenta', 'lime', 'brown']
     num_colors = len(colors)
 
@@ -283,7 +286,10 @@ def plot_backbone(ListPosition, _list_mentor, backbone_links, MAX, direct_links)
 
     plt_margin = MAX * 0.05
     plt.axis([-plt_margin, MAX + plt_margin, -plt_margin, MAX + plt_margin])
-    plt.title("Cây Prim-Dijkstra các nút backbone", fontsize=14)
+    if done is not None:
+        plt.title("Cây Prim-Dijkstra các nút backbone", fontsize=14)
+    else: done is True
+    plt.title("Cây sau Mentor 1", fontsize=14)
     plt.xlabel("X")
     plt.ylabel("Y")
     plt.grid(True)
