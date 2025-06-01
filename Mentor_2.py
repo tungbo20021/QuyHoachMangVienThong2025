@@ -286,10 +286,10 @@ def plot_backbone(ListPosition, _list_mentor, backbone_links, MAX, direct_links,
 
     plt_margin = MAX * 0.05
     plt.axis([-plt_margin, MAX + plt_margin, -plt_margin, MAX + plt_margin])
-    if done is not None:
+    if done is None:
         plt.title("Cây Prim-Dijkstra các nút backbone", fontsize=14)
-    else: done is True
-    plt.title("Cây sau Mentor 1", fontsize=14)
+    else: 
+        plt.title("Cây sau Mentor 1", fontsize=14)
     plt.xlabel("X")
     plt.ylabel("Y")
     plt.grid(True)
