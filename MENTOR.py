@@ -294,7 +294,7 @@ def MenTor(ListPosition,TrafficMatrix,MAX,C,w,RadiusRatio,NumNode,Limit,DeBug):
         if u in ListBackbone and v in ListBackbone:
             traffic_matrix.at[u, v] += traffic
             traffic_matrix.at[v, u] += traffic  # Nếu 2 chiều
-            print("===================================================") 
+            print("-----------------------------------------------") 
             print(f"{u}-{v} traffic {traffic}")
             # Tìm group chứa u và v
             group_u = next((g for g in ListMentor if g[0].get_name() == u), None)
@@ -315,6 +315,10 @@ def MenTor(ListPosition,TrafficMatrix,MAX,C,w,RadiusRatio,NumNode,Limit,DeBug):
 
                 # ListTraffic.append(temp_traffic)
     print("======= Ma trận lưu lượng giữa các nút backbone =======")
+    for u, v, traffic in special_traffic:
+        if u in ListBackbone and v in ListBackbone:
+            print(f"{u} <-> {v} traffic {traffic_matrix.at[u, v]}")
+    print("=======================================================")
     print(traffic_matrix)
     
 
@@ -352,7 +356,7 @@ def MenTor(ListPosition,TrafficMatrix,MAX,C,w,RadiusRatio,NumNode,Limit,DeBug):
     Node.matplot_mentor(ListMentor,MAX)
 
     # Node.plt.show()
-    return ListMentor, ListBackbone, center_node
+    return ListMentor, ListBackbone, center_node, traffic_matrix
 
 
 
