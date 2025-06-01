@@ -4,9 +4,9 @@ import MENTOR
 import argparse
 import matplotlib.pyplot as plt
 import matplotlib
-matplotlib.use('TkAgg')
-
 import Mentor_2
+matplotlib.use('TkAgg')
+from Mentor_2 import plot_backbone_full
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -27,15 +27,11 @@ def main():
     ListPosition, TrafficMatrix = InitialTopo.Global_Init_Topo(args.max, args.num_node, args.debug)
     
     # Lấy đủ 8 giá trị trả về
-    backbone, link_path_count, link_cost, link_cost_changed, link_usage, ListMentor, prim_links, _ = Mentor_2.Mentor2_ISP(
+    backbone, ListMentor, prim_links, _ = Mentor_2.Mentor2_ISP(
         ListPosition, TrafficMatrix, args.max, args.C, args.w, args.radius,args.num_node, args.limit_mentor,
         args.umin , args.alpha, debug=args.debug
     )
     
-    # Xuất kết quả ra file (nếu muốn)
-    Mentor_2.write_result('mentor2_result.txt', backbone, link_path_count, link_cost, link_cost_changed, link_usage)
-    print("Đã xuất kết quả Mentor 2 ra mentor2_result.txt")
-
     # # Đọc liên kết bổ sung từ file
     direct_links = read_direct_links('mentor2_result.txt', ListPosition)
     # # Lọc các direct_links không có trong prim_links
@@ -50,7 +46,7 @@ def main():
     print("Danh sách direct_links:", [(n1.get_name(), n2.get_name()) for n1, n2 in filtered_direct_links])
 
     # # Vẽ cả prim_links (xám) và direct_links (đỏ)
-    Mentor_2.plot_backbone_full(ListPosition, ListMentor, prim_links, filtered_direct_links, args.max)
+    plot_backbone_full(ListPosition, ListMentor, prim_links, direct_links, args.max)
     plt.show()
     
 def read_result_file(filename):

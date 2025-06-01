@@ -70,7 +70,7 @@ def prim_dijkstra_backbone_links(ListPosition, backbone_nodes,ListMentor,center_
 
 def Mentor2_ISP(ListPosition, TrafficMatrix, MAX, C, w, RadiusRatio,NumNode, Limit, umin, alpha, debug):
     # 1. Tính Mentor 1 để lấy các nhóm backbone và truy nhập
-    ListMentor, ListBackbone,center_node,traffic_matrix  = MENTOR.MenTor([Node_copy(n) for n in ListPosition], TrafficMatrix, MAX, C, w, RadiusRatio,NumNode, Limit, debug)
+    ListMentor, ListBackbone,center_node, special_traffic, traffic_matrix  = MENTOR.MenTor([Node_copy(n) for n in ListPosition], TrafficMatrix, MAX, C, w, RadiusRatio,NumNode, Limit, debug)
     # 2. Lấy ra các backbone node (node đầu tiên mỗi group)
     backbone_nodes = [group[0] for group in ListMentor if len(group) > 0]
     backbone_names = [n.get_name() for n in backbone_nodes]
@@ -84,77 +84,65 @@ def Mentor2_ISP(ListPosition, TrafficMatrix, MAX, C, w, RadiusRatio,NumNode, Lim
     backbone_graph = nx.Graph()
     for n1, n2 in backbone_links:
         backbone_graph.add_edge(n1.get_name(), n2.get_name())
+    # 4. Tính toán các liên kết trực tiếp bổ sung
+    hop_list = []
+    for u, v, traffic in special_traffic:
+        if u in ListBackbone and v in ListBackbone:
+            try:
+                hops = nx.shortest_path_length(backbone_graph, source=u, target=v)
+                hop_list.append((u, v, hops, traffic))
+            except nx.NetworkXNoPath:
+                print(f"Không tồn tại đường đi từ {u} đến {v} trên backbone.")
 
-    link_usage = []
-    link_cost = []
-    link_cost_changed = []
-    link_path_count = []
+    # Sắp xếp theo số hops giảm dần
+    hop_list.sort(key=lambda x: x[2], reverse=True)
 
-    for n1, n2 in backbone_links:
-        name1, name2 = n1.get_name(), n2.get_name()
-        cost = math.sqrt((n1.get_position_x() - n2.get_position_x())**2 + (n1.get_position_y() - n2.get_position_y())**2)
-        # truyền backbone_graph vào
-        usage, count = calc_link_usage(name1, name2, backbone_names, TrafficMatrix, backbone_graph, ListMentor)
-        utilization = usage / C if C > 0 else 0
-        if utilization < umin:
-            cost_new = cost * (1 + alpha)
+    # In ra kết quả đã sắp xếp
+    for u, v, hops, traffic in hop_list:
+        print(f"Cặp backbone {u} - {v}: số hops = {hops}, traffic = {traffic_matrix.at[u,v]}")
+
+    print("------------------------------------------")
+
+    for u, v, hops, traffic in hop_list:
+        n = math.ceil(traffic_matrix.at[u, v] / C)
+        u_compare = traffic_matrix.at[u, v] / (n * C)
+        u_compare = round(u_compare, 2)
+        print(f"Cặp backbone {u} - {v}: n = upperbound(T({u},{v})/{C})={n}, u= T({u},{v})/({n}*{C})= {u_compare:.2f}")
+        if u_compare > umin:
+            print("u>umin")
+            print(f"Thêm liên kết trực tiếp {u} - {v}")
+            node_map = {n.get_name(): n for n in ListPosition}
+            direct_links.append((node_map[u], node_map[v]))
         else:
-            cost_new = cost
-        link_usage.append(utilization)
-        link_cost.append(cost)
-        link_cost_changed.append(cost_new)
-        link_path_count.append(count)
+            print("u<=umin")
+            if hops == 1:
+                print(f"Cặp này chỉ 1 hop, không thêm liên kết trực tiếp. Lưu lượng hiện tại: {traffic_matrix.at[u, v]}")
+                # Không thêm direct_links, chỉ hiển thị lưu lượng
+            else:
+                print(f"Chuyển lưu lượng 1 hop qua mạng")
+                path = nx.shortest_path(backbone_graph, source=u, target=v)
+                if len(path) > 2:
+                    min_traffic = float('inf')
+                    home_node = None
+                    for i in range(1, len(path) - 1):
+                        home = path[i]
+                        # Tổng lưu lượng hiện tại trên hai đoạn
+                        traffic_sum = traffic_matrix.at[u, home] + traffic_matrix.at[home, v]
+                        if traffic_sum < min_traffic:
+                            min_traffic = traffic_sum
+                            home_node = home
+                    print(f"Nút home giữa {u} và {v} là {home_node} (tổng lưu lượng hiện tại trên 2 đoạn = {min_traffic})")
+                    # Cộng thêm traffic mới vào hai đoạn
+                    traffic_matrix.at[u, home_node] += traffic_matrix.at[u, v]
+                    traffic_matrix.at[home_node, v] += traffic_matrix.at[u, v]
+                    print(f"Lưu lượng sau cộng: ({u},{home_node})={traffic_matrix.at[u, home_node]}, ({home_node},{v})={traffic_matrix.at[home_node, v]}")
+                else:
+                    print("Không tìm được nút home phù hợp (đường đi quá ngắn)")
+            print("------------------------------------------")
 
-    # Sau khi có backbone_links (cây backbone), kiểm tra từng cặp backbone node
-    for i in range(len(backbone_nodes)):
-        for j in range(i+1, len(backbone_nodes)):
-            n1, n2 = backbone_nodes[i], backbone_nodes[j]
-            if not backbone_graph.has_edge(n1.get_name(), n2.get_name()):
-                usage, _ = calc_link_usage(n1.get_name(), n2.get_name(), backbone_names, TrafficMatrix, backbone_graph, ListMentor)
-                if usage > C:
-                    backbone_links.append((n1, n2))
-                    direct_links.append((n1, n2))
-                    backbone_graph.add_edge(n1.get_name(), n2.get_name())
+    print("=== KẾT THÚC TÍNH TOÁN LIÊN KẾT TRỰC TIẾP ===")    
+    return backbone_names, ListMentor, prim_links, direct_links
 
-    return backbone_names, link_path_count, link_cost, link_cost_changed, link_usage, ListMentor, prim_links, direct_links
-
-def find_backbone_of_node(node_id, ListMentor):
-    for group in ListMentor:
-        if node_id in [n.get_name() for n in group]:
-            return group[0].get_name()
-    return None
-
-def calc_link_usage(name1, name2, backbone_names, TrafficMatrix, backbone_graph, ListMentor):
-    usage = 0
-    count = 0
-    n = len(TrafficMatrix)
-    for src in range(1, n+1):
-        for dst in range(1, n+1):
-            if src == dst:
-                continue
-            flow = TrafficMatrix[src-1][dst-1]
-            if flow > 0:
-                b_src = find_backbone_of_node(src, ListMentor)
-                b_dst = find_backbone_of_node(dst, ListMentor)
-                if b_src is None or b_dst is None or b_src == b_dst:
-                    continue
-                try:
-                    path = nx.shortest_path(backbone_graph, source=b_src, target=b_dst)
-                    for i in range(len(path)-1):
-                        u, v = path[i], path[i+1]
-                        if (u == name1 and v == name2) or (u == name2 and v == name1):
-                            usage += flow
-                            count += 1
-                            break
-                except nx.NetworkXNoPath:
-                    continue
-    return usage, count
-
-# def write_result(filename, backbone, link_path_count, link_cost, link_cost_changed, link_usage):
-#     with open(filename, 'w', encoding='utf-8') as f:
-#         f.write("Liên kết\tSố đường\tĐộ sử dụng\tGiá ban đầu\tGiá thay đổi\n")
-#         for i in range(len(link_path_count)):
-#             f.write(f"{backbone[i]}-{backbone[(i+1)%len(backbone)]}\t{link_path_count[i]}\t{link_usage[i]:.2f}\t{link_cost[i]:.2f}\t{link_cost_changed[i]:.2f}\n")
 
 def plot_backbone(ListPosition,_list_mentor, backbone_links, MAX):
     colors = ['red', 'blue', 'green', 'orange', 'purple', 'magenta', 'lime', 'brown']
@@ -203,73 +191,63 @@ def plot_backbone(ListPosition,_list_mentor, backbone_links, MAX):
     plt.grid(True)
     plt.show()
 
-# def plot_backbone_full(ListPosition, _list_mentor, prim_links, direct_links, MAX):
-#     colors = ['red', 'blue', 'green', 'orange', 'purple', 'magenta', 'lime', 'brown']
-#     num_colors = len(colors)
+def plot_backbone_full(ListPosition, _list_mentor, prim_links, direct_links, MAX):
+    colors = ['red', 'blue', 'green', 'orange', 'purple', 'magenta', 'lime', 'brown']
+    num_colors = len(colors)
 
-#     for group_idx, group in enumerate(_list_mentor):
-#         if not group:
-#             continue
+    for group_idx, group in enumerate(_list_mentor):
+        if not group:
+            continue
 
-#         color = colors[group_idx % num_colors]
+        color = colors[group_idx % num_colors]
 
-#         xpos = []
-#         ypos = []
+        xpos = []
+        ypos = []
 
-#         for node in group:
-#             xpos.append(node.get_position_x())
-#             ypos.append(node.get_position_y())
+        for node in group:
+            xpos.append(node.get_position_x())
+            ypos.append(node.get_position_y())
 
-#         # --- Backbone Node ---
-#         backbone = group[0]
-#         plt.plot(backbone.get_position_x(), backbone.get_position_y(),
-#                  'o', markersize=14, markerfacecolor=color, markeredgecolor='black', markeredgewidth=2, zorder=3)
-#         plt.text(backbone.get_position_x(), backbone.get_position_y(), str(backbone.get_name()),
-#                  color='white', size=12, weight='bold', ha="center", va="center",
-#                  bbox=dict(facecolor=color, edgecolor='black', boxstyle='round'), zorder = 3)
+        # --- Backbone Node ---
+        backbone = group[0]
+        plt.plot(backbone.get_position_x(), backbone.get_position_y(),
+                 'o', markersize=14, markerfacecolor=color, markeredgecolor='black', markeredgewidth=2, zorder=3)
+        plt.text(backbone.get_position_x(), backbone.get_position_y(), str(backbone.get_name()),
+                 color='white', size=12, weight='bold', ha="center", va="center",
+                 bbox=dict(facecolor=color, edgecolor='black', boxstyle='round'), zorder=3)
 
-#         # --- Access Nodes ---
-#         for node in group[1:]:
-#             plt.plot(node.get_position_x(), node.get_position_y(),
-#                      'o', markersize=7, markerfacecolor=color, markeredgecolor='black', markeredgewidth=1, zorder = 2)
-#             plt.text(node.get_position_x(), node.get_position_y(), str(node.get_name()),
-#                      color='black', size=9, ha="center", va="center",
-#                      bbox=dict(facecolor=color, edgecolor='gray', boxstyle='round'), zorder = 2)
+        # --- Access Nodes ---
+        for node in group[1:]:
+            plt.plot(node.get_position_x(), node.get_position_y(),
+                     'o', markersize=7, markerfacecolor=color, markeredgecolor='black', markeredgewidth=1, zorder=2)
+            plt.text(node.get_position_x(), node.get_position_y(), str(node.get_name()),
+                     color='black', size=9, ha="center", va="center",
+                     bbox=dict(facecolor=color, edgecolor='gray', boxstyle='round'), zorder=2)
 
-#     # Thiết lập vùng hiển thị
-    
-#     # Vẽ liên kết tạm thời/gián tiếp (cây Prim-Dijkstra) - màu xám
-#     for n1, n2 in prim_links:
-#         plt.plot([n1.get_position_x(), n2.get_position_x()],
-#                  [n1.get_position_y(), n2.get_position_y()], color='black', linewidth=2, linestyle='-')
+    # Vẽ liên kết backbone cũ (Prim-Dijkstra) - màu đen
+    for n1, n2 in prim_links:
+        plt.plot([n1.get_position_x(), n2.get_position_x()],
+                 [n1.get_position_y(), n2.get_position_y()], color='black', linewidth=2, linestyle='-')
 
-#     # Loại bỏ các direct_links trùng với prim_links (không phân biệt thứ tự)
-#     prim_set = set((min(n1.get_name(), n2.get_name()), max(n1.get_name(), n2.get_name())) for n1, n2 in prim_links)
-#     filtered_direct_links = []
-#     for n1, n2 in direct_links:
-#         key = (min(n1.get_name(), n2.get_name()), max(n1.get_name(), n2.get_name()))
-#         if key not in prim_set:
-#             filtered_direct_links.append((n1, n2))
+    # Vẽ tất cả các liên kết trực tiếp bổ sung - màu đỏ
+    for n1, n2 in direct_links:
+        plt.plot([n1.get_position_x(), n2.get_position_x()],
+                 [n1.get_position_y(), n2.get_position_y()], color='red', linewidth=3, linestyle='-')
 
-#     # Vẽ liên kết trực tiếp bổ sung - màu đỏ, chỉ vẽ nếu không trùng
-#     for n1, n2 in filtered_direct_links:
-#         plt.plot([n1.get_position_x(), n2.get_position_x()],
-#                  [n1.get_position_y(), n2.get_position_y()], color='red', linewidth=3, linestyle='-')
+    # Thêm chú thích
+    if direct_links:
+        plt.plot([], [], color='red', linewidth=3, linestyle='-', label='Liên kết trực tiếp bổ sung')
+    if prim_links:
+        plt.plot([], [], color='black', linewidth=2, linestyle='-', label='Prim-Dijkstra')
 
-#     # Thêm chú thích
-#     if filtered_direct_links:
-#         plt.plot([], [], color='red', linewidth=3, linestyle='-', label='Liên kết trực tiếp bổ sung')
-#     if prim_links:
-#         plt.plot([], [], color='black', linewidth=2, linestyle='-', label='Prim-Dijkstra')
-
-#     plt.legend()
-#     plt_margin = MAX * 0.05
-#     plt.axis([-plt_margin, MAX + plt_margin, -plt_margin, MAX + plt_margin])
-#     plt.title("Các liên kết backbone (xám: Prim-Dijkstra, đỏ: trực tiếp bổ sung)", fontsize=14)
-#     plt.xlabel("X")
-#     plt.ylabel("Y")
-#     plt.grid(True)
-#     plt.show()
+    plt.legend()
+    plt_margin = MAX * 0.05
+    plt.axis([-plt_margin, MAX + plt_margin, -plt_margin, MAX + plt_margin])
+    plt.title("Các liên kết backbone (đen: Prim-Dijkstra, đỏ: trực tiếp bổ sung)", fontsize=14)
+    plt.xlabel("X")
+    plt.ylabel("Y")
+    plt.grid(True)
+    plt.show()
 
 def Node_copy(node):
     # Deep copy cho Node tối giản

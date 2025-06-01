@@ -320,8 +320,6 @@ def MenTor(ListPosition,TrafficMatrix,MAX,C,w,RadiusRatio,NumNode,Limit,DeBug):
             print(f"{u} <-> {v} traffic {traffic_matrix.at[u, v]}")
     print("=======================================================")
     print(traffic_matrix)
-    
-
     print("\nTính moment và xác định nút backbone trung tâm:")
     moment_dict = {}
     center_node = None
@@ -356,7 +354,7 @@ def MenTor(ListPosition,TrafficMatrix,MAX,C,w,RadiusRatio,NumNode,Limit,DeBug):
     Node.matplot_mentor(ListMentor,MAX)
 
     # Node.plt.show()
-    return ListMentor, ListBackbone, center_node, traffic_matrix
+    return ListMentor, ListBackbone, center_node, special_traffic, traffic_matrix
 
 
 
