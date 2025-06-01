@@ -109,7 +109,7 @@ def Mentor2_ISP(ListPosition, TrafficMatrix, MAX, C, w, RadiusRatio,NumNode, Lim
         u_compare = round(u_compare, 2)
         print(f"Cặp backbone {u} - {v}: n = upperbound(T({u},{v})/{C})={n}, u= T({u},{v})/({n}*{C})= {u_compare:.2f}")
         if u_compare > umin:
-            print("u>umin")
+            print("u > umin")
             print(f"Thêm liên kết trực tiếp {u} - {v}")
             node_map = {n.get_name(): n for n in ListPosition}
             direct_links.append((node_map[u], node_map[v]))
