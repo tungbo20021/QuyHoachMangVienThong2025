@@ -4,6 +4,8 @@ import Node
 import MENTOR
 import networkx as nx
 import matplotlib.pyplot as plt
+import seaborn as sns
+import pandas as pd
 
 def prim_dijkstra_backbone_links(ListPosition, backbone_nodes,ListMentor,center_node,alpha,MAX):
     import heapq
@@ -64,8 +66,7 @@ def prim_dijkstra_backbone_links(ListPosition, backbone_nodes,ListMentor,center_
     print("=== KẾT THÚC THUẬT TOÁN PRIM-DIJKSTRA ===")
     print("=========================================")
     links = [(node_map[u], node_map[v]) for u, v in tree_edges]
-    plot_backbone(ListPosition,ListMentor, links, MAX,None,None,None)
-
+    plot_backbone(ListPosition,ListMentor, links, MAX,None,None,None,None)
     return links
 
 
@@ -153,7 +154,7 @@ def Mentor2_ISP(ListPosition, TrafficMatrix, MAX, C, w, RadiusRatio,NumNode, Lim
             print(f"Lưu lượng sau cộng: T({u},{home_node}) = {traffic_matrix.at[u,home_node]} + {traffic_matrix.at[u,v]} = {traffic_sum_uhome}, T({home_node},{v}) = {traffic_matrix.at[home_node,v]} + {traffic_matrix.at[u,v]} = {traffic_sum_homev}")
             traffic_matrix.at[u, home_node] += traffic_matrix.at[u, v]
             traffic_matrix.at[home_node, v] += traffic_matrix.at[u, v]
-            print(f"Số hops từ {u} đến {home_node}: {hops_uhome}, từ {home_node} đến {v}: {hops_homev}")
+            print(f"Số hops {u} - {home_node}: {hops_uhome}, {home_node} - {v}: {hops_homev}")
             if hops_uhome == 1:
                 final_hop_list.append((u, home_node, traffic_matrix.at[u, home_node]))
             else:
@@ -183,7 +184,7 @@ def Mentor2_ISP(ListPosition, TrafficMatrix, MAX, C, w, RadiusRatio,NumNode, Lim
         n = math.ceil(traffic_matrix.at[u, v] / C)
         print(f"Cặp backbone {u} - {v}: T({u},{v})={traffic_matrix.at[u, v]}, n = upperbound(T({u},{v})/C) = upperbound({traffic_matrix.at[u,v]}/{C}) = {n}") 
     
-    plot_backbone(ListPosition, ListMentor, backbone_links, MAX, direct_links,True,final_hop_list)
+    plot_backbone(ListPosition, ListMentor, backbone_links, MAX, direct_links,True,final_hop_list,None)
     total_cost = 0
     total_cost_mentor = 0
     # for n1, n2 in backbone_links:
@@ -193,12 +194,11 @@ def Mentor2_ISP(ListPosition, TrafficMatrix, MAX, C, w, RadiusRatio,NumNode, Lim
     #     total_cost += dist
     #     print(f"Tổng cost Prim_Dijkstra (Tổng khoảng cách Euclid các liên kết backbone): {total_cost}")
     
-    
     print("=== KẾT THÚC TÍNH TOÁN LIÊN KẾT TRỰC TIẾP ===")
-    return backbone_names, ListMentor, prim_links, direct_links
+    return  ListMentor,ListBackbone,special_traffic, traffic_matrix
 
 
-def plot_backbone(ListPosition, _list_mentor, backbone_links, MAX, direct_links,done,final_hop_list):
+def plot_backbone(ListPosition, _list_mentor, backbone_links, MAX, direct_links,done,final_hop_list,compare):
     colors = ['red', 'blue', 'green', 'orange', 'purple', 'magenta', 'lime', 'brown']
     num_colors = len(colors)
 
@@ -259,9 +259,16 @@ def plot_backbone(ListPosition, _list_mentor, backbone_links, MAX, direct_links,
     plt_margin = MAX * 0.05
     plt.axis([-plt_margin, MAX + plt_margin, -plt_margin, MAX + plt_margin])
     if done is None:
-        plt.title("Cây Prim-Dijkstra các nút backbone", fontsize=14)
-    else: 
-        plt.title("Cây sau Mentor 1", fontsize=14)
+        if compare is None:
+            plt.title("Cây Prim-Dijkstra các nút backbone", fontsize=14)
+        else:
+            plt.title("Cây Prim-Dijkstra các nút backbone sau khi tăng dung lượng", fontsize=14)
+    else:
+        if compare is None:
+            plt.title("Cây sau Mentor 1", fontsize=14)
+        else:
+            plt.title("Cây sau Mentor 1 sau khi tăng dung lượng", fontsize=14)
+
     plt.xlabel("X")
     plt.ylabel("Y")
     plt.grid(True)
@@ -280,4 +287,221 @@ def get_special_traffic(u, v, special_traffic):
         if (uu == u and vv == v) or (uu == v and vv == u):
             return traffic
     return 0
+
+def Mentor_compare(ListPosition, TrafficMatrix, MAX, C, w, RadiusRatio,NumNode, Limit, umin, alpha, debug,ListMentor, ListBackbone, special_traffic, traffic_matrix):
+    # 1. Tính Mentor 1 để lấy các nhóm backbone và truy nhập
+    print("===================================================") 
+    print("===================================================") 
+    print("=== BẮT ĐẦU TĂNG LƯU LƯỢNG CÁC NÚT ===")
+    print("===================================================") 
+    print("===================================================")
+    special_traffic += [
+        (3, 20, 3),
+        (13, 67, 4), 
+        (15, 30, 3), 
+        (40, 58, 5)
+    ]
+    print('special_traffic =', special_traffic)
+    print("===================================================") 
+    traffic_matrix = pd.DataFrame(0, index=ListBackbone, columns=ListBackbone)
+    print("Backbone")
+    for u, v, traffic in special_traffic:
+        if u in ListBackbone and v in ListBackbone:
+            # 1. Cộng traffic giữa backbone u và v
+            traffic_matrix.at[u, v] += traffic
+            traffic_matrix.at[v, u] += traffic  # Nếu 2 chiều
+            print (u,'-',v,'traffic',traffic)
+            # 2. Cộng thêm lưu lượng của các nút con thuộc nhóm u
+          # Khởi tạo traffic_matrix
+    # Khởi tạo traffic_matrix
+    traffic_matrix = pd.DataFrame(0, index=ListBackbone, columns=ListBackbone)
+    traffic_matrix.style.set_properties(**{'text-align': 'center'}).set_table_styles(
+    [{'selector': 'th', 'props': [('text-align', 'center')]}]
+)
+    # Tạo từ điển để tra cứu nhanh lưu lượng giữa các cặp
+    special_traffic_dict = {(u, v): t for u, v, t in special_traffic}
+    special_traffic_dict.update({(v, u): t for u, v, t in special_traffic})  # 2 chiều
+
+    # Duyệt từng cặp backbone (u, v)
+    for u, v, traffic in special_traffic:
+        if u in ListBackbone and v in ListBackbone:
+            traffic_matrix.at[u, v] += traffic
+            traffic_matrix.at[v, u] += traffic  # Nếu 2 chiều
+            print("-----------------------------------------------") 
+            print(f"{u}-{v} traffic {traffic}")
+            # Tìm group chứa u và v
+            group_u = next((g for g in ListMentor if g[0].get_name() == u), None)
+            group_v = next((g for g in ListMentor if g[0].get_name() == v), None)
+            if group_u is None or group_v is None:
+                continue
+
+            # Duyệt từng cặp node con (node_u, node_v)
+            for node_u in group_u[1:]:  # bỏ backbone
+                id_u = node_u.get_name()
+                for node_v in group_v[1:]:
+                    id_v = node_v.get_name()
+                    if (id_u, id_v) in special_traffic_dict:
+                        traffic = special_traffic_dict[(id_u, id_v)]
+                        print(f"{id_u} <-> {id_v} traffic {traffic}")
+                        traffic_matrix.at[u, v] += traffic
+                        traffic_matrix.at[v, u] += traffic
+
+                # ListTraffic.append(temp_traffic)
+    print("======= Ma trận lưu lượng giữa các nút backbone =======")
+    for u, v, traffic in special_traffic:
+        if u in ListBackbone and v in ListBackbone:
+            print(f"{u} <-> {v} traffic {traffic_matrix.at[u, v]}")
+    print("=======================================================")
+    print(traffic_matrix)
+    print("\nTính moment và xác định nút backbone trung tâm:")
+    moment_dict = {}
+    center_node = None
+    min_moment = float('inf')
+
+    # Tạo map tên -> node để tiện truy xuất từ ListMentor
+    name_to_node = {node.get_name(): node for group in ListMentor for node in group}
+
+    for i in ListBackbone:
+        moment = 0
+        node_i = name_to_node[i]
+        for j in ListBackbone:
+            if i == j:
+                continue
+            node_j = name_to_node[j]
+            dist = math.sqrt(
+                (node_i.get_position_x() - node_j.get_position_x()) ** 2 +
+                (node_i.get_position_y() - node_j.get_position_y()) ** 2
+            )
+            weight = node_j.get_traffic()
+            moment += dist * weight
+        moment_dict[i] = moment
+        print(f"Moment({i}) = {moment:.4f}")
+        if moment < min_moment:
+            min_moment = moment
+            center_node = node_i
+
+    print(f"\n==> Nút backbone trung tâm là: {center_node.get_name()} với moment = {min_moment:.4f}")
+    # 2. Lấy ra các backbone node (node đầu tiên mỗi group)
+    backbone_nodes = [group[0] for group in ListMentor if len(group) > 0]
+    backbone_names = [n.get_name() for n in backbone_nodes]
+
+    # 3. Xây dựng các liên kết backbone theo Prim-Dijkstra
+    prim_links = prim_dijkstra_backbone_links(ListPosition, backbone_nodes, ListMentor, center_node, alpha, MAX)
+    backbone_links = prim_links.copy()
+    direct_links = []
+
+    # Tạo đồ thị backbone từ các liên kết backbone
+    backbone_graph = nx.Graph()
+    for n1, n2 in backbone_links:
+        backbone_graph.add_edge(n1.get_name(), n2.get_name())
+    # 4. Tính toán các liên kết trực tiếp bổ sung
+    hop_list = []
+    final_hop_list = []
+    direct_links = []
+
+    for u, v, traffic in special_traffic:
+        if u in ListBackbone and v in ListBackbone:
+            try:
+                hops = nx.shortest_path_length(backbone_graph, source=u, target=v)
+                hop_list.append((u, v, hops, traffic))
+            except nx.NetworkXNoPath:
+                print(f"Không tồn tại đường đi từ {u} đến {v} trên backbone.")
+    
+    # 1. Tách các cặp hops > 1 sang term_hop_list, còn lại là hops = 1
+    term_hop_list = [item for item in hop_list if item[2] > 1]
+    hop_list_1hop = [item for item in hop_list if item[2] == 1]
+    # Sắp xếp theo số hops giảm dần
+    term_hop_list.sort(key=lambda x: x[2], reverse=True)
+    print(f"Term_hop_list trước khi xử lý: {term_hop_list}")
+    hop_list.sort(key=lambda x: x[2], reverse=True)
+    # In ra kết quả đã sắp xếp
+    for u, v, hops, traffic in hop_list:
+        print(f"Cặp backbone {u} - {v}: số hops = {hops}, traffic = {traffic_matrix.at[u,v]}")    
+    print("------------------------------------------")
+
+    while term_hop_list:
+        u, v, hops, traffic = term_hop_list[0]
+        n = math.ceil(traffic_matrix.at[u, v] / C)
+        u_compare = traffic_matrix.at[u, v] / (n * C)
+        u_compare = round(u_compare, 2)
+        print(f"Cặp backbone {u} - {v}: traffic = {traffic_matrix.at[u, v]}")
+        print(f"n = upperbound(T({u},{v})/C) = upperbound({traffic_matrix.at[u,v]}/{C}) = {n}")
+        print(f"u= T({u},{v})/(n*C) = {traffic_matrix.at[u,v]}/({n}*{C}) = {u_compare:.2f}")
+        if u_compare > umin:
+            print("u > umin")
+            print(f"Thêm liên kết trực tiếp {u} - {v}")
+            direct_links.append((u, v))
+            traffic_matrix.at[u, v] += traffic_matrix.at[u, v]
+            final_hop_list.append((u, v, traffic_matrix.at[u, v]))
+            print(f"T({u},{v})={traffic_matrix.at[u, v]}")
+        else:
+            print("u <= umin")
+            print(f"Chuyển lưu lượng 1 hop qua mạng")
+            path = nx.shortest_path(backbone_graph, source=u, target=v)
+            min_dist = float('inf')
+            home_node = None
+            node_map = {n.get_name(): n for n in ListPosition}
+            for i in range(1, len(path) - 1):
+                home = path[i]
+                # So sánh tổng khoảng cách Euclid
+                dist_uhome = math.sqrt((node_map[u].get_position_x() - node_map[home].get_position_x())**2 +
+                                        (node_map[u].get_position_y() - node_map[home].get_position_y())**2)
+                dist_homev = math.sqrt((node_map[home].get_position_x() - node_map[v].get_position_x())**2 +
+                                        (node_map[home].get_position_y() - node_map[v].get_position_y())**2)
+                dist_sum = dist_uhome + dist_homev
+                print(f"Cost({u},{home}) + Cost({home},{v}) = {dist_uhome:.2f} + {dist_homev:.2f} = {dist_sum:.2f}")
+                if dist_sum < min_dist:
+                    min_dist = dist_sum
+                    home_node = home
+            print(f"Nút home giữa {u} và {v} là {home_node}")
+            # Cộng thêm traffic mới vào hai đoạn
+            hops_uhome = nx.shortest_path_length(backbone_graph, source=u, target=home_node)
+            hops_homev = nx.shortest_path_length(backbone_graph, source=home_node, target=v)
+            traffic_sum_uhome = traffic_matrix.at[u, home_node] + traffic_matrix.at[u, v]
+            traffic_sum_homev = traffic_matrix.at[home_node, v] + traffic_matrix.at[u, v]
+            print(f"Lưu lượng sau cộng: T({u},{home_node}) = {traffic_matrix.at[u,home_node]} + {traffic_matrix.at[u,v]} = {traffic_sum_uhome}, T({home_node},{v}) = {traffic_matrix.at[home_node,v]} + {traffic_matrix.at[u,v]} = {traffic_sum_homev}")
+            traffic_matrix.at[u, home_node] += traffic_matrix.at[u, v]
+            traffic_matrix.at[home_node, v] += traffic_matrix.at[u, v]
+            print(f"Số hops {u} - {home_node}: {hops_uhome}, {home_node} - {v}: {hops_homev}")
+            if hops_uhome == 1:
+                final_hop_list.append((u, home_node, traffic_matrix.at[u, home_node]))
+            else:
+                term_hop_list.append((u, home_node, hops_uhome, traffic_matrix.at[u, home_node]))
+                
+            if hops_homev == 1:
+                final_hop_list.append((home_node, v, traffic_matrix.at[home_node, v]))
+            else:
+                term_hop_list.append((home_node, v, hops_homev, traffic_matrix.at[home_node, v]))
+        # Sắp xếp lại cho vòng lặp tiếp theo
+        term_hop_list = [item for item in term_hop_list if not ((item[0] == u and item[1] == v) or (item[0] == v and item[1] == u))]
+        term_hop_list.sort(key=lambda x: x[2], reverse=True)
+        print(f"Term_hop_list sau khi xử lý: {term_hop_list}")
+        print("------------------------------------------")
+
+    # 4. Sau khi xử lý xong, duyệt các cặp hops = 1 còn lại trong hop_list
+    for u, v, hops, traffic in hop_list_1hop:
+        traffic_sum = traffic_matrix.at[u, v]+ traffic_matrix.at[v, u]
+        print(f"Cặp backbone {u} - {v}, traffic {traffic_matrix.at[u,v]} có số hops = 1, chỉ thêm dung lượng.")
+        print(f"T({u},{v})={traffic_matrix.at[u, v]}+{traffic_matrix.at[u, v]}={traffic_sum}")
+        traffic_matrix.at[u, v] += traffic_matrix.at[u, v]
+        final_hop_list.append((u, v, traffic_matrix.at[u, v]))
+        print("------------------------------------------")
+
+    print("Xét lưu lượng các kết nối 1 hop:")
+    for u, v, traffic in final_hop_list:
+        n = math.ceil(traffic_matrix.at[u, v] / C)
+        print(f"Cặp backbone {u} - {v}: T({u},{v})={traffic_matrix.at[u, v]}, n = upperbound(T({u},{v})/C) = upperbound({traffic_matrix.at[u,v]}/{C}) = {n}") 
+    
+    plot_backbone(ListPosition, ListMentor, backbone_links, MAX, direct_links,True,final_hop_list,True)
+    total_cost = 0
+    total_cost_mentor = 0
+    # for n1, n2 in backbone_links:
+    #     dx = n1.get_position_x() - n2.get_position_x()
+    #     dy = n1.get_position_y() - n2.get_position_y()
+    #     dist = math.sqrt(dx*dx + dy*dy)
+    #     total_cost += dist
+    #     print(f"Tổng cost Prim_Dijkstra (Tổng khoảng cách Euclid các liên kết backbone): {total_cost}")
+    
+    print("=== KẾT THÚC TÍNH TOÁN LIÊN KẾT TRỰC TIẾP ===")
+    return backbone_names, ListMentor, prim_links, direct_links
 

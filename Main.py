@@ -26,10 +26,13 @@ def main():
     ListPosition, TrafficMatrix = InitialTopo.Global_Init_Topo(args.max, args.num_node, args.debug)
     
     # Lấy đủ 8 giá trị trả về
-    backbone, ListMentor, prim_links, _ = Mentor_2.Mentor2_ISP(
+    ListMentor, ListBackbone,special_traffic, traffic_matrix = Mentor_2.Mentor2_ISP(
         ListPosition, TrafficMatrix, args.max, args.C, args.w, args.radius,args.num_node, args.limit_mentor,
         args.umin , args.alpha, debug=args.debug
     )
+    
+    Mentor_2.Mentor_compare(ListPosition, TrafficMatrix, args.max, args.C, args.w, args.radius,args.num_node, args.limit_mentor,
+        args.umin , args.alpha, args.debug, ListMentor, ListBackbone, special_traffic, traffic_matrix)
 
 # Giả sử bạn đã có ListPosition và MAX từ bước tạo topology
 if __name__ == '__main__':
