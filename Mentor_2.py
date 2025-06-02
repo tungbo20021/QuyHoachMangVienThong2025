@@ -62,6 +62,7 @@ def prim_dijkstra_backbone_links(ListPosition, backbone_nodes,ListMentor,center_
             print(f"  Cập nhật cạnh ({v}, {w}) với nhãn: {alpha}*{d_v:.2f} + {euclid:.2f} = {cost:.2f}")
 
     print("=== KẾT THÚC THUẬT TOÁN PRIM-DIJKSTRA ===")
+    print("=========================================")
     links = [(node_map[u], node_map[v]) for u, v in tree_edges]
     plot_backbone(ListPosition,ListMentor, links, MAX,None,None,None)
 
@@ -86,7 +87,9 @@ def Mentor2_ISP(ListPosition, TrafficMatrix, MAX, C, w, RadiusRatio,NumNode, Lim
         backbone_graph.add_edge(n1.get_name(), n2.get_name())
     # 4. Tính toán các liên kết trực tiếp bổ sung
     hop_list = []
-    node_map = {n.get_name(): n for n in ListPosition}
+    final_hop_list = []
+    direct_links = []
+
     for u, v, traffic in special_traffic:
         if u in ListBackbone and v in ListBackbone:
             try:
@@ -94,159 +97,101 @@ def Mentor2_ISP(ListPosition, TrafficMatrix, MAX, C, w, RadiusRatio,NumNode, Lim
                 hop_list.append((u, v, hops, traffic))
             except nx.NetworkXNoPath:
                 print(f"Không tồn tại đường đi từ {u} đến {v} trên backbone.")
-
+    
+    # 1. Tách các cặp hops > 1 sang term_hop_list, còn lại là hops = 1
+    term_hop_list = [item for item in hop_list if item[2] > 1]
+    hop_list_1hop = [item for item in hop_list if item[2] == 1]
     # Sắp xếp theo số hops giảm dần
+    term_hop_list.sort(key=lambda x: x[2], reverse=True)
+    print(f"Term_hop_list trước khi xử lý: {term_hop_list}")
     hop_list.sort(key=lambda x: x[2], reverse=True)
-    final_hop_list = []
-    term_hop_list = []
     # In ra kết quả đã sắp xếp
     for u, v, hops, traffic in hop_list:
-        print(f"Cặp backbone {u} - {v}: số hops = {hops}, traffic = {traffic_matrix.at[u,v]}")
-        
+        print(f"Cặp backbone {u} - {v}: số hops = {hops}, traffic = {traffic_matrix.at[u,v]}")    
     print("------------------------------------------")
 
-    # Xử lý ban đầu với hop_list
-    for u, v, hops, traffic in hop_list:
-        n = math.ceil(traffic_matrix.at[u, v] / C)
-        u_compare = traffic_matrix.at[u, v] / (n * C)
-        u_compare = round(u_compare, 2)
-        print(f"Cặp backbone {u} - {v}: traffic = {traffic_matrix.at[u, v]}")
-        print(f"n = upperbound(T({u},{v})/C)=upperbound({traffic_matrix.at[u,v]}/{C})={n}")
-        print(f"u= T({u},{v})/(n*C)={traffic_matrix.at[u,v]}/({n}*{C}) ={u_compare:.2f}")
-        if u_compare > umin:
-            print("u > umin")
-            if hops > 1:
-                print(f"Thêm liên kết trực tiếp {u} - {v}")
-                direct_links.append((u, v))
-            else:
-                print("Kết nối trực tiếp => thêm lưu lượng vào ({u},{v})")\
-                
-            traffic_matrix.at[u, v] += traffic_matrix.at[u, v]
-            final_hop_list.append((u, v, traffic_matrix.at[u, v]))
-            print(f"T({u},{v})={traffic_matrix.at[u, v]}")
-        else:
-            print("u <= umin")
-            if hops == 1:
-                print("Kết nối trực tiếp => thêm lưu lượng vào ({u},{v})")
-                traffic_matrix.at[u, v] += traffic_matrix.at[u, v]
-                print(f"T({u},{v})={traffic_matrix.at[u, v]}")
-                final_hop_list.append((u, v, traffic_matrix.at[u, v]))
-            else:
-                print(f"Chuyển lưu lượng 1 hop qua mạng")
-                path = nx.shortest_path(backbone_graph, source=u, target=v)
-                if len(path) >= 2:
-                    min_traffic = float('inf')
-                    home_node = None
-                    for i in range(1, len(path) - 1):
-                        home = path[i]
-                        # Tổng lưu lượng hiện tại trên hai đoạn
-                        dist_uhome = math.sqrt((node_map[u].get_position_x() - node_map[home].get_position_x())**2 +
-                        (node_map[u].get_position_y() - node_map[home].get_position_y())**2)
-                        dist_homev = math.sqrt((node_map[home].get_position_x() - node_map[v].get_position_x())**2 +
-                        (node_map[home].get_position_y() - node_map[v].get_position_y())**2)
-                        dist_sum = dist_uhome + dist_homev
-                        print(f"cost({u},{home}) + cost({home},{v}) = {dist_uhome:.2f} + {dist_homev:.2f} = {dist_sum:.2f}")
-                        if dist_sum < min_traffic:
-                            min_traffic = dist_sum
-                            home_node = home
-                    print(f"Nút home giữa {u} và {v} là {home_node}")
-                    # Cộng thêm traffic mới vào hai đoạn
-                    hops_uhome = nx.shortest_path_length(backbone_graph, source=u, target=home_node)
-                    hops_homev = nx.shortest_path_length(backbone_graph, source=home_node, target=v)
-                    traffic_sum_uhome = traffic_matrix.at[u, home_node] + traffic_matrix.at[u, v]
-                    traffic_sum_homev = traffic_matrix.at[home_node, v] + traffic_matrix.at[u, v]
-                    print(f"Lưu lượng sau cộng: ({u},{home_node})={traffic_matrix.at[u,home_node]}+{traffic_matrix.at[u,v]}={traffic_sum_uhome}, ({home_node},{v})={traffic_matrix.at[home_node,v]}+{traffic_matrix.at[u,v]}={traffic_sum_homev}")
-                    traffic_matrix.at[u, home_node] += traffic_matrix.at[u, v]
-                    traffic_matrix.at[home_node, v] += traffic_matrix.at[u, v]
-                    print(f"Số hops từ {u} đến {home_node}: {hops_uhome}, từ {home_node} đến {v}: {hops_homev}")
-                    
-                    if hops_uhome == 1:
-                        final_hop_list.append((u, home_node, traffic_matrix.at[u, home_node]))
-                    else:
-                        term_hop_list.append((u, home_node, hops_uhome, traffic_matrix.at[u, home_node]))
-
-                    if hops_homev == 1:
-                        final_hop_list.append((home_node, v, traffic_matrix.at[home_node, v]))
-                    else:
-                        term_hop_list.append((home_node, v,hop_list, traffic_matrix.at[home_node, v]))
-        print("------------------------------------------")
-
-    # Lặp lại với term_hop_list cho đến khi trống
     while term_hop_list:
-        u, v, hops, traffic = term_hop_list.pop(0)
+        u, v, hops, traffic = term_hop_list[0]
         n = math.ceil(traffic_matrix.at[u, v] / C)
         u_compare = traffic_matrix.at[u, v] / (n * C)
         u_compare = round(u_compare, 2)
         print(f"Cặp backbone {u} - {v}: traffic = {traffic_matrix.at[u, v]}")
-        print(f"n = upperbound(T({u},{v})/C)=upperbound({traffic_matrix.at[u,v]}/{C})={n}")
-        print(f"u= T({u},{v})/(n*C)={traffic_matrix.at[u,v]}/({n}*{C}) ={u_compare:.2f}")
+        print(f"n = upperbound(T({u},{v})/C) = upperbound({traffic_matrix.at[u,v]}/{C}) = {n}")
+        print(f"u= T({u},{v})/(n*C) = {traffic_matrix.at[u,v]}/({n}*{C}) = {u_compare:.2f}")
         if u_compare > umin:
             print("u > umin")
-            if hops > 1:
-                print(f"Thêm liên kết trực tiếp {u} - {v}")
-                direct_links.append((u, v))
-            else:
-                print("Kết nối trực tiếp => thêm lưu lượng vào ({u},{v})")
-            
+            print(f"Thêm liên kết trực tiếp {u} - {v}")
+            direct_links.append((u, v))
             traffic_matrix.at[u, v] += traffic_matrix.at[u, v]
             final_hop_list.append((u, v, traffic_matrix.at[u, v]))
             print(f"T({u},{v})={traffic_matrix.at[u, v]}")
         else:
             print("u <= umin")
-            if hops == 1:
-                print("Kết nối trực tiếp => thêm lưu lượng vào ({u},{v})")
-                traffic_matrix.at[u, v] += traffic_matrix.at[u, v]
-                print(f"T({u},{v})={traffic_matrix.at[u, v]}")
-                final_hop_list.append((u, v, traffic_matrix.at[u, v]))
+            print(f"Chuyển lưu lượng 1 hop qua mạng")
+            path = nx.shortest_path(backbone_graph, source=u, target=v)
+            min_dist = float('inf')
+            home_node = None
+            node_map = {n.get_name(): n for n in ListPosition}
+            for i in range(1, len(path) - 1):
+                home = path[i]
+                # So sánh tổng khoảng cách Euclid
+                dist_uhome = math.sqrt((node_map[u].get_position_x() - node_map[home].get_position_x())**2 +
+                                        (node_map[u].get_position_y() - node_map[home].get_position_y())**2)
+                dist_homev = math.sqrt((node_map[home].get_position_x() - node_map[v].get_position_x())**2 +
+                                        (node_map[home].get_position_y() - node_map[v].get_position_y())**2)
+                dist_sum = dist_uhome + dist_homev
+                print(f"Cost({u},{home}) + Cost({home},{v}) = {dist_uhome:.2f} + {dist_homev:.2f} = {dist_sum:.2f}")
+                if dist_sum < min_dist:
+                    min_dist = dist_sum
+                    home_node = home
+            print(f"Nút home giữa {u} và {v} là {home_node}")
+            # Cộng thêm traffic mới vào hai đoạn
+            hops_uhome = nx.shortest_path_length(backbone_graph, source=u, target=home_node)
+            hops_homev = nx.shortest_path_length(backbone_graph, source=home_node, target=v)
+            traffic_sum_uhome = traffic_matrix.at[u, home_node] + traffic_matrix.at[u, v]
+            traffic_sum_homev = traffic_matrix.at[home_node, v] + traffic_matrix.at[u, v]
+            print(f"Lưu lượng sau cộng: T({u},{home_node}) = {traffic_matrix.at[u,home_node]} + {traffic_matrix.at[u,v]} = {traffic_sum_uhome}, T({home_node},{v}) = {traffic_matrix.at[home_node,v]} + {traffic_matrix.at[u,v]} = {traffic_sum_homev}")
+            traffic_matrix.at[u, home_node] += traffic_matrix.at[u, v]
+            traffic_matrix.at[home_node, v] += traffic_matrix.at[u, v]
+            print(f"Số hops từ {u} đến {home_node}: {hops_uhome}, từ {home_node} đến {v}: {hops_homev}")
+            if hops_uhome == 1:
+                final_hop_list.append((u, home_node, traffic_matrix.at[u, home_node]))
             else:
-                print(f"Chuyển lưu lượng 1 hop qua mạng")
-                path = nx.shortest_path(backbone_graph, source=u, target=v)
-                if len(path) >= 2:
-                    min_traffic = float('inf')
-                    home_node = None
-                    for i in range(1, len(path) - 1):
-                        home = path[i]
-                        traffic_uhome = get_special_traffic(u, home, special_traffic)
-                        traffic_homev = get_special_traffic(home, v, special_traffic)
-                        traffic_sum = traffic_uhome + traffic_homev
-                        print(f"cost({u},{home}) + cost({home},{v}) = {traffic_uhome} + {traffic_homev} = {traffic_sum}")
-                        if traffic_sum < min_traffic:
-                            min_traffic = traffic_sum
-                            home_node = home
-                    print(f"Nút home giữa {u} và {v} là {home_node}")
-                    # Cộng thêm traffic mới vào hai đoạn
-                    hops_uhome = nx.shortest_path_length(backbone_graph, source=u, target=home_node)
-                    hops_homev = nx.shortest_path_length(backbone_graph, source=home_node, target=v)
-                    traffic_sum_uhome = traffic_matrix.at[u, home_node] + traffic_matrix.at[u, v]
-                    traffic_sum_homev = traffic_matrix.at[home_node, v] + traffic_matrix.at[u, v]
-                    print(f"Lưu lượng sau cộng: ({u},{home_node})={traffic_matrix.at[u,home_node]}+{traffic_matrix.at[u,v]}={traffic_sum_uhome}, ({home_node},{v})={traffic_matrix.at[home_node,v]}+{traffic_matrix.at[u,v]}={traffic_sum_homev}")
-                    traffic_matrix.at[u, home_node] += traffic_matrix.at[u, v]
-                    traffic_matrix.at[home_node, v] += traffic_matrix.at[u, v]
-                    print(f"Số hops từ {u} đến {home_node}: {hops_uhome}, từ {home_node} đến {v}: {hops_homev}")
-
-                    if hops_uhome == 1:
-                        final_hop_list.append((u, home_node, traffic_matrix.at[u, home_node]))
-                    else:
-                        term_hop_list.append((u, home_node, hops_uhome, traffic_matrix.at[u, home_node]))
-
-                    if hops_homev == 1:
-                        final_hop_list.append((home_node, v, traffic_matrix.at[home_node, v]))
-                    else:
-                        term_hop_list.append((home_node, v, hops_homev, traffic_matrix.at[home_node, v]))
+                term_hop_list.append((u, home_node, hops_uhome, traffic_matrix.at[u, home_node]))
+                
+            if hops_homev == 1:
+                final_hop_list.append((home_node, v, traffic_matrix.at[home_node, v]))
+            else:
+                term_hop_list.append((home_node, v, hops_homev, traffic_matrix.at[home_node, v]))
+        # Sắp xếp lại cho vòng lặp tiếp theo
+        term_hop_list = [item for item in term_hop_list if not ((item[0] == u and item[1] == v) or (item[0] == v and item[1] == u))]
+        term_hop_list.sort(key=lambda x: x[2], reverse=True)
+        print(f"Term_hop_list sau khi xử lý: {term_hop_list}")
         print("------------------------------------------")
+
+    # 4. Sau khi xử lý xong, duyệt các cặp hops = 1 còn lại trong hop_list
+    for u, v, hops, traffic in hop_list_1hop:
+        traffic_sum = traffic_matrix.at[u, v]+ traffic_matrix.at[v, u]
+        print(f"Cặp backbone {u} - {v}, traffic {traffic_matrix.at[u,v]} có số hops = 1, chỉ thêm dung lượng.")
+        print(f"T({u},{v})={traffic_matrix.at[u, v]}+{traffic_matrix.at[u, v]}={traffic_sum}")
+        traffic_matrix.at[u, v] += traffic_matrix.at[u, v]
+        final_hop_list.append((u, v, traffic_matrix.at[u, v]))
+        print("------------------------------------------")
+
     print("Xét lưu lượng các kết nối 1 hop:")
     for u, v, traffic in final_hop_list:
-       n = math.ceil(traffic_matrix.at[u, v] / C)
-       print(f"Cặp backbone {u} - {v}: T({u},{v})={traffic_matrix.at[u, v]}, n = upperbound(T({u},{v})/C)=upperbound({traffic_matrix.at[u,v]}/{C})={n}") 
+        n = math.ceil(traffic_matrix.at[u, v] / C)
+        print(f"Cặp backbone {u} - {v}: T({u},{v})={traffic_matrix.at[u, v]}, n = upperbound(T({u},{v})/C) = upperbound({traffic_matrix.at[u,v]}/{C}) = {n}") 
+    
     plot_backbone(ListPosition, ListMentor, backbone_links, MAX, direct_links,True,final_hop_list)
     total_cost = 0
     total_cost_mentor = 0
-    for n1, n2 in backbone_links:
-        dx = n1.get_position_x() - n2.get_position_x()
-        dy = n1.get_position_y() - n2.get_position_y()
-        dist = math.sqrt(dx*dx + dy*dy)
-        total_cost += dist
-        print(f"Tổng cost Prim_Dijkstra (Tổng khoảng cách Euclid các liên kết backbone): {total_cost}")
+    # for n1, n2 in backbone_links:
+    #     dx = n1.get_position_x() - n2.get_position_x()
+    #     dy = n1.get_position_y() - n2.get_position_y()
+    #     dist = math.sqrt(dx*dx + dy*dy)
+    #     total_cost += dist
+    #     print(f"Tổng cost Prim_Dijkstra (Tổng khoảng cách Euclid các liên kết backbone): {total_cost}")
     
     
     print("=== KẾT THÚC TÍNH TOÁN LIÊN KẾT TRỰC TIẾP ===")
