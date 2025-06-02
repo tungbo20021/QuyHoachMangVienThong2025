@@ -63,7 +63,7 @@ def prim_dijkstra_backbone_links(ListPosition, backbone_nodes,ListMentor,center_
 
     print("=== KẾT THÚC THUẬT TOÁN PRIM-DIJKSTRA ===")
     links = [(node_map[u], node_map[v]) for u, v in tree_edges]
-    plot_backbone(ListPosition,ListMentor, links, MAX,None,None)
+    plot_backbone(ListPosition,ListMentor, links, MAX,None,None,None)
 
     return links
 
@@ -109,7 +109,7 @@ def Mentor2_ISP(ListPosition, TrafficMatrix, MAX, C, w, RadiusRatio,NumNode, Lim
         n = math.ceil(traffic_matrix.at[u, v] / C)
         u_compare = traffic_matrix.at[u, v] / (n * C)
         u_compare = round(u_compare, 2)
-        print(f"Cặp backbone {u} - {v}:")
+        print(f"Cặp backbone {u} - {v}: traffic = {traffic_matrix.at[u, v]}")
         print(f"n = upperbound(T({u},{v})/C)=upperbound({traffic_matrix.at[u,v]}/{C})={n}")
         print(f"u= T({u},{v})/(n*C)={traffic_matrix.at[u,v]}/({n}*{C}) ={u_compare:.2f}")
         if u_compare > umin:
@@ -148,11 +148,13 @@ def Mentor2_ISP(ListPosition, TrafficMatrix, MAX, C, w, RadiusRatio,NumNode, Lim
                             home_node = home
                     print(f"Nút home giữa {u} và {v} là {home_node}")
                     # Cộng thêm traffic mới vào hai đoạn
-                    traffic_matrix.at[u, home_node] += traffic_matrix.at[u, v]
-                    traffic_matrix.at[home_node, v] += traffic_matrix.at[u, v]
                     hops_uhome = nx.shortest_path_length(backbone_graph, source=u, target=home_node)
                     hops_homev = nx.shortest_path_length(backbone_graph, source=home_node, target=v)
-                    print(f"Lưu lượng sau cộng: ({u},{home_node})={traffic_matrix.at[u, home_node]}, ({home_node},{v})={traffic_matrix.at[home_node, v]}")
+                    traffic_sum_uhome = traffic_matrix.at[u, home_node] + traffic_matrix.at[u, v]
+                    traffic_sum_homev = traffic_matrix.at[home_node, v] + traffic_matrix.at[u, v]
+                    print(f"Lưu lượng sau cộng: ({u},{home_node})={traffic_matrix.at[u,home_node]}+{traffic_matrix.at[u,v]}={traffic_sum_uhome}, ({home_node},{v})={traffic_matrix.at[home_node,v]}+{traffic_matrix.at[u,v]}={traffic_sum_homev}")
+                    traffic_matrix.at[u, home_node] += traffic_matrix.at[u, v]
+                    traffic_matrix.at[home_node, v] += traffic_matrix.at[u, v]
                     print(f"Số hops từ {u} đến {home_node}: {hops_uhome}, từ {home_node} đến {v}: {hops_homev}")
                     
                     if hops_uhome == 1:
@@ -172,7 +174,7 @@ def Mentor2_ISP(ListPosition, TrafficMatrix, MAX, C, w, RadiusRatio,NumNode, Lim
         n = math.ceil(traffic_matrix.at[u, v] / C)
         u_compare = traffic_matrix.at[u, v] / (n * C)
         u_compare = round(u_compare, 2)
-        print(f"Cặp backbone {u} - {v}:")
+        print(f"Cặp backbone {u} - {v}: traffic = {traffic_matrix.at[u, v]}")
         print(f"n = upperbound(T({u},{v})/C)=upperbound({traffic_matrix.at[u,v]}/{C})={n}")
         print(f"u= T({u},{v})/(n*C)={traffic_matrix.at[u,v]}/({n}*{C}) ={u_compare:.2f}")
         if u_compare > umin:
@@ -182,6 +184,7 @@ def Mentor2_ISP(ListPosition, TrafficMatrix, MAX, C, w, RadiusRatio,NumNode, Lim
                 direct_links.append((u, v))
             else:
                 print("Kết nối trực tiếp => thêm lưu lượng vào ({u},{v})")
+            
             traffic_matrix.at[u, v] += traffic_matrix.at[u, v]
             final_hop_list.append((u, v, traffic_matrix.at[u, v]))
             print(f"T({u},{v})={traffic_matrix.at[u, v]}")
@@ -209,11 +212,13 @@ def Mentor2_ISP(ListPosition, TrafficMatrix, MAX, C, w, RadiusRatio,NumNode, Lim
                             home_node = home
                     print(f"Nút home giữa {u} và {v} là {home_node}")
                     # Cộng thêm traffic mới vào hai đoạn
-                    traffic_matrix.at[u, home_node] += traffic_matrix.at[u, v]
-                    traffic_matrix.at[home_node, v] += traffic_matrix.at[u, v]
                     hops_uhome = nx.shortest_path_length(backbone_graph, source=u, target=home_node)
                     hops_homev = nx.shortest_path_length(backbone_graph, source=home_node, target=v)
-                    print(f"Lưu lượng sau cộng: ({u},{home_node})={traffic_matrix.at[u, home_node]}, ({home_node},{v})={traffic_matrix.at[home_node, v]}")
+                    traffic_sum_uhome = traffic_matrix.at[u, home_node] + traffic_matrix.at[u, v]
+                    traffic_sum_homev = traffic_matrix.at[home_node, v] + traffic_matrix.at[u, v]
+                    print(f"Lưu lượng sau cộng: ({u},{home_node})={traffic_matrix.at[u,home_node]}+{traffic_matrix.at[u,v]}={traffic_sum_uhome}, ({home_node},{v})={traffic_matrix.at[home_node,v]}+{traffic_matrix.at[u,v]}={traffic_sum_homev}")
+                    traffic_matrix.at[u, home_node] += traffic_matrix.at[u, v]
+                    traffic_matrix.at[home_node, v] += traffic_matrix.at[u, v]
                     print(f"Số hops từ {u} đến {home_node}: {hops_uhome}, từ {home_node} đến {v}: {hops_homev}")
 
                     if hops_uhome == 1:
@@ -230,12 +235,22 @@ def Mentor2_ISP(ListPosition, TrafficMatrix, MAX, C, w, RadiusRatio,NumNode, Lim
     for u, v, traffic in final_hop_list:
        n = math.ceil(traffic_matrix.at[u, v] / C)
        print(f"Cặp backbone {u} - {v}: T({u},{v})={traffic_matrix.at[u, v]}, n = upperbound(T({u},{v})/C)=upperbound({traffic_matrix.at[u,v]}/{C})={n}") 
-    plot_backbone(ListPosition, ListMentor, backbone_links, MAX, direct_links,True)
+    plot_backbone(ListPosition, ListMentor, backbone_links, MAX, direct_links,True,final_hop_list)
+    total_cost = 0
+    total_cost_mentor = 0
+    for n1, n2 in backbone_links:
+        dx = n1.get_position_x() - n2.get_position_x()
+        dy = n1.get_position_y() - n2.get_position_y()
+        dist = math.sqrt(dx*dx + dy*dy)
+        total_cost += dist
+        print(f"Tổng cost Prim_Dijkstra (Tổng khoảng cách Euclid các liên kết backbone): {total_cost}")
+    
+    
     print("=== KẾT THÚC TÍNH TOÁN LIÊN KẾT TRỰC TIẾP ===")
     return backbone_names, ListMentor, prim_links, direct_links
 
 
-def plot_backbone(ListPosition, _list_mentor, backbone_links, MAX, direct_links,done):
+def plot_backbone(ListPosition, _list_mentor, backbone_links, MAX, direct_links,done,final_hop_list):
     colors = ['red', 'blue', 'green', 'orange', 'purple', 'magenta', 'lime', 'brown']
     num_colors = len(colors)
 
@@ -274,7 +289,7 @@ def plot_backbone(ListPosition, _list_mentor, backbone_links, MAX, direct_links,
     # Vẽ liên kết backbone theo cây Prim-Dijkstra
     for n1, n2 in backbone_links:
         plt.plot([n1.get_position_x(), n2.get_position_x()],
-                 [n1.get_position_y(), n2.get_position_y()], 'k-', linewidth=2)
+                 [n1.get_position_y(), n2.get_position_y()], 'k-', linewidth=2, label='Backbone (Prim-Dijkstra)')
 
     # Vẽ các direct_links bằng đường đỏ
     if direct_links is not None:
@@ -282,7 +297,16 @@ def plot_backbone(ListPosition, _list_mentor, backbone_links, MAX, direct_links,
             node3 = node_map[n3] if n3 in node_map else n3
             node4 = node_map[n4] if n4 in node_map else n4
             plt.plot([node3.get_position_x(), node4.get_position_x()],
-                     [node3.get_position_y(), node4.get_position_y()], color='red', linewidth=2, linestyle='--')
+                     [node3.get_position_y(), node4.get_position_y()], color='red', linewidth=2, linestyle='--',label='Direct Link')
+    if final_hop_list is not None:
+            for u, v, traffic in final_hop_list:
+                # Kiểm tra nếu (u, v) hoặc (v, u) không nằm trong direct_links
+                if (u, v) not in direct_links and (v, u) not in direct_links:
+                    node_u = node_map[u] if u in node_map else u
+                    node_v = node_map[v] if v in node_map else v
+                    plt.plot([node_u.get_position_x(), node_v.get_position_x()],
+                             [node_u.get_position_y(), node_v.get_position_y()],
+                             color='orange', linewidth=2,label='1-hop link')
 
     plt_margin = MAX * 0.05
     plt.axis([-plt_margin, MAX + plt_margin, -plt_margin, MAX + plt_margin])
@@ -308,3 +332,4 @@ def get_special_traffic(u, v, special_traffic):
         if (uu == u and vv == v) or (uu == v and vv == u):
             return traffic
     return 0
+
