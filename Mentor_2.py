@@ -86,6 +86,7 @@ def Mentor2_ISP(ListPosition, TrafficMatrix, MAX, C, w, RadiusRatio,NumNode, Lim
         backbone_graph.add_edge(n1.get_name(), n2.get_name())
     # 4. Tính toán các liên kết trực tiếp bổ sung
     hop_list = []
+    node_map = {n.get_name(): n for n in ListPosition}
     for u, v, traffic in special_traffic:
         if u in ListBackbone and v in ListBackbone:
             try:
@@ -132,21 +133,23 @@ def Mentor2_ISP(ListPosition, TrafficMatrix, MAX, C, w, RadiusRatio,NumNode, Lim
                 final_hop_list.append((u, v, traffic_matrix.at[u, v]))
             else:
                 print(f"Chuyển lưu lượng 1 hop qua mạng")
-                path = nx.shortest_path(backbone_graph, source=u, target=v)
-                if len(path) >= 2:
-                    min_traffic = float('inf')
-                    home_node = None
-                    for i in range(1, len(path) - 1):
-                        home = path[i]
-                        # Tổng lưu lượng hiện tại trên hai đoạn
-                        traffic_uhome = get_special_traffic(u, home, special_traffic)
-                        traffic_homev = get_special_traffic(home, v, special_traffic)
-                        traffic_sum = traffic_uhome + traffic_homev
-                        print(f"cost({u},{home}) + cost({home},{v}) = {traffic_uhome} + {traffic_homev} = {traffic_sum}")
-                        if traffic_sum < min_traffic:
-                            min_traffic = traffic_sum
-                            home_node = home
-                    print(f"Nút home giữa {u} và {v} là {home_node}")
+                # path = nx.shortest_path(backbone_graph, source=u, target=v)
+                # if len(path) >= 2:
+                #     min_traffic = float('inf')
+                #     home_node = None
+                #     for i in range(1, len(path) - 1):
+                #         home = path[i]
+                #         # Tổng lưu lượng hiện tại trên hai đoạn
+                #         dist_uhome = math.sqrt((node_map[u].get_position_x() - node_map[home].get_position_x())**2 +
+                #         (node_map[u].get_position_y() - node_map[home].get_position_y())**2)
+                #         dist_homev = math.sqrt((node_map[home].get_position_x() - node_map[v].get_position_x())**2 +
+                #         (node_map[home].get_position_y() - node_map[v].get_position_y())**2)
+                #         dist_sum = dist_uhome + dist_homev
+                #         print(f"cost({u},{home}) + cost({home},{v}) = {dist_uhome:.2f} + {dist_homev:.2f} = {dist_sum:.2f}")
+                #         if dist_sum < min_traffic:
+                #             min_traffic = dist_sum
+                #             home_node = home
+                #     print(f"Nút home giữa {u} và {v} là {home_node}")
                     # Cộng thêm traffic mới vào hai đoạn
                     hops_uhome = nx.shortest_path_length(backbone_graph, source=u, target=home_node)
                     hops_homev = nx.shortest_path_length(backbone_graph, source=home_node, target=v)
