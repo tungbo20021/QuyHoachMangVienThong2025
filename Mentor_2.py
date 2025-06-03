@@ -66,7 +66,7 @@ def prim_dijkstra_backbone_links(ListPosition, backbone_nodes,ListMentor,center_
     print("=== KẾT THÚC THUẬT TOÁN PRIM-DIJKSTRA ===")
     print("=========================================")
     links = [(node_map[u], node_map[v]) for u, v in tree_edges]
-    plot_backbone(ListPosition,ListMentor, links, MAX,None,None,None,None)
+    # plot_backbone(ListPosition,ListMentor, links, MAX,None,None,None,None)
     return links
 
 
@@ -79,9 +79,11 @@ def Mentor2_ISP(ListPosition, TrafficMatrix, MAX, C, w, RadiusRatio,NumNode, Lim
 
     # 3. Xây dựng các liên kết backbone theo Prim-Dijkstra
     prim_links = prim_dijkstra_backbone_links(ListPosition, backbone_nodes, ListMentor, center_node, alpha, MAX)
+    plot_backbone(ListPosition,ListMentor, prim_links, MAX,None,None,None,None)
     backbone_links = prim_links.copy()
     direct_links = []
     backbone_links_compare = backbone_links.copy()
+    traffic_matrix_compare = traffic_matrix.copy()
     # Tạo đồ thị backbone từ các liên kết backbone
     backbone_graph = nx.Graph()
     for n1, n2 in backbone_links:
@@ -188,7 +190,7 @@ def Mentor2_ISP(ListPosition, TrafficMatrix, MAX, C, w, RadiusRatio,NumNode, Lim
         n_old = math.ceil(traffic / C)
         n_old_dict[(u, v)] = n_old
         n_old_dict[(v, u)] = n_old  # 2 chiều
-    calc_n_on_backbone_hops(backbone_links_compare, ListBackbone, traffic_matrix, C)
+    calc_n_on_backbone_hops(backbone_links_compare, ListBackbone, traffic_matrix_compare, C)
     print_link_costs_with_n(backbone_links, direct_links, ListPosition, final_hop_list, C)
     plot_backbone(ListPosition, ListMentor, backbone_links, MAX, direct_links,True,final_hop_list,None)
     total_cost = 0
@@ -201,7 +203,7 @@ def Mentor2_ISP(ListPosition, TrafficMatrix, MAX, C, w, RadiusRatio,NumNode, Lim
     #     print(f"Tổng cost Prim_Dijkstra (Tổng khoảng cách Euclid các liên kết backbone): {total_cost}")
     direct_links_before = direct_links.copy()
     print("=== KẾT THÚC TÍNH TOÁN LIÊN KẾT TRỰC TIẾP ===")
-    return  ListMentor,ListBackbone,special_traffic, traffic_matrix, n_old_dict,direct_links_before
+    return  ListMentor,ListBackbone,special_traffic, traffic_matrix, n_old_dict,direct_links_before,backbone_links_compare
 
 
 def plot_backbone(ListPosition, _list_mentor, backbone_links, MAX, direct_links,done,final_hop_list,compare):
@@ -295,7 +297,7 @@ def get_special_traffic(u, v, special_traffic):
     return 0
 
 def Mentor_compare(ListPosition, TrafficMatrix, MAX, C, w, RadiusRatio,NumNode, Limit, umin, alpha,
-                    debug,ListMentor, ListBackbone, special_traffic, traffic_matrix,n_old_dict,direct_links_before):
+                    debug,ListMentor, ListBackbone, special_traffic, traffic_matrix,n_old_dict,direct_links_before,backbone_links_compare):
     # 1. Tính Mentor 1 để lấy các nhóm backbone và truy nhập
     print("===================================================") 
     print("===================================================") 
@@ -396,6 +398,8 @@ def Mentor_compare(ListPosition, TrafficMatrix, MAX, C, w, RadiusRatio,NumNode, 
     prim_links = prim_dijkstra_backbone_links(ListPosition, backbone_nodes, ListMentor, center_node, alpha, MAX)
     backbone_links = prim_links.copy()
     direct_links = []
+    compare_backbone_links(backbone_links_compare, backbone_links, name1="Mentor2", name2="Mentor_compare")
+    plot_backbone(ListPosition,ListMentor, prim_links, MAX,None,None,None,None)
 
     # Tạo đồ thị backbone từ các liên kết backbone
     backbone_graph = nx.Graph()
@@ -586,43 +590,41 @@ def print_link_costs_with_n(backbone_links, direct_links, ListPosition, final_ho
     """
     node_map = {n.get_name(): n for n in ListPosition}
 
-    # Tạo dict tra cứu số đường sử dụng (n) trên từng liên kết
+    # Tạo dict tra cứu số đường sử dụng (n) và traffic trên từng liên kết
     n_dict = {}
+    traffic_dict = {}
     for u, v, traffic in final_hop_list:
         n = math.ceil(traffic / C)
         n_dict[(u, v)] = n
         n_dict[(v, u)] = n  # 2 chiều
+        traffic_dict[(u, v)] = traffic
+        traffic_dict[(v, u)] = traffic
 
     print("=== BẢNG GIÁ LIÊN KẾT BACKBONE SAU MENTOR1 ===")
     print(f"{'Node1':>6} {'Node2':>6} {'Traffic':>12} {'N':>10} {'Cost':>12}")
 
-    # Giá cho backbone_links (có thể là direct hoặc không)
+    # Gom tất cả các link vào một set để duyệt chung
     all_links = set()
     for n1, n2 in backbone_links:
-        all_links.add((n1.get_name(), n2.get_name()))
+        all_links.add(tuple(sorted((n1.get_name(), n2.get_name()))))
     for n1, n2 in direct_links:
-        all_links.add((n1, n2))
+        all_links.add(tuple(sorted((n1, n2))))
+
     sum_cost = 0
+    # Sắp xếp theo Node1, Node2 (giả sử tên node là số, nếu là chữ thì bỏ int())
     for u, v in sorted(all_links, key=lambda x: (int(x[0]), int(x[1]))):
         if u not in node_map or v not in node_map:
             continue
         x1, y1 = node_map[u].get_position_x(), node_map[u].get_position_y()
         x2, y2 = node_map[v].get_position_x(), node_map[v].get_position_y()
         dist = ((x1 - x2)**2 + (y1 - y2)**2) ** 0.5
-        # cost_one = round(0.3 * dist)  # Không cần in nữa
         n = n_dict.get((u, v), 1)
-        traffic = 0
-        # Tìm traffic của cặp này trong final_hop_list
-        for uu, vv, t in final_hop_list:
-            if (uu == u and vv == v) or (uu == v and vv == u):
-                traffic = t
-                break
+        traffic = traffic_dict.get((u, v), 0)
         total_cost = round(0.3 * dist) * n
         sum_cost += total_cost
         print(f"{u:>6} {v:>6} {traffic:>12} {n:>10} {total_cost:>12}")
-        
-    print(f"Total Cost: {sum_cost}")
 
+    print(f"Total Cost: {sum_cost}")
     print("=== KẾT THÚC BẢNG GIÁ ===\n")
 
 def calc_n_on_backbone_hops(backbone_links, ListBackbone, traffic_matrix, C):
@@ -664,27 +666,50 @@ def calc_n_on_backbone_hops(backbone_links, ListBackbone, traffic_matrix, C):
     print(f"{'Node1':>6} {'Node2':>6} {'Traffic':>10} {'N':>6} {'Cost':>10}")
     printed = set()
     sum_cost = 0
-    for (a, b), traffic in sorted(hop_traffic.items(), key=lambda x: (int(x[0][0]), int(x[0][1]))):
-        n = math.ceil(traffic / C)
+
+    # Gom tất cả các link (có traffic và không traffic) vào một set để duyệt chung
+    all_links = set(tuple(sorted((a, b))) for (a, b) in hop_traffic.keys())
+    for n1, n2 in backbone_links:
+        all_links.add(tuple(sorted((n1.get_name(), n2.get_name()))))
+
+    # Sắp xếp theo Node1, Node2 (giả sử tên node là số, nếu là chữ thì bỏ int())
+    for a, b in sorted(all_links, key=lambda x: (x[0], x[1])):
         n1, n2 = node_map[a], node_map[b]
         dx = n1.get_position_x() - n2.get_position_x()
         dy = n1.get_position_y() - n2.get_position_y()
         dist = math.sqrt(dx*dx + dy*dy)
+        traffic = hop_traffic.get((a, b), 0)
+        n = math.ceil(traffic / C) if traffic > 0 else 1
         cost = round(0.3 * dist) * n
         sum_cost += cost
         print(f"{a:>6} {b:>6} {traffic:>10} {n:>6} {cost:>10}")
-        printed.add(tuple(sorted((a, b))))
 
-    # In các link còn lại (không có traffic, n=1)
-    for n1, n2 in backbone_links:
-        key = tuple(sorted((n1.get_name(), n2.get_name())))
-        if key not in printed:
-            dx = n1.get_position_x() - n2.get_position_x()
-            dy = n1.get_position_y() - n2.get_position_y()
-            dist = math.sqrt(dx*dx + dy*dy)
-            cost = round(0.3 * dist)
-            print(f"{n1.get_name():>6} {n2.get_name():>6} {0:>10} {1:>6} {cost:>10}")
-            sum_cost += cost
     print(f"Total Cost: {sum_cost}")
     return hop_traffic
+
+def compare_backbone_links(links1, links2, name1="Mentor2", name2="Mentor_compare"):
+    """
+    So sánh hai danh sách backbone_links (dạng [(node1, node2), ...]) và in ra sự khác biệt.
+    Nếu giống nhau hoàn toàn thì in "cây backbone không đổi".
+    """
+    set1 = set(tuple(sorted((n1.get_name(), n2.get_name()))) for n1, n2 in links1)
+    set2 = set(tuple(sorted((n1.get_name(), n2.get_name()))) for n1, n2 in links2)
+
+    only_in_1 = set1 - set2
+    only_in_2 = set2 - set1
+
+    if not only_in_1 and not only_in_2:
+        print("CÂY BACKBONE KHÔNG ĐỔI")
+        ("================================")
+    else:
+        print("\n=== SO SÁNH BACKBONE LINKS ===")
+        if only_in_1:
+            print(f"Chỉ có ở {name1}:")
+            for u, v in sorted(only_in_1, key=lambda x: (int(x[0]), int(x[1]))):
+                print(f"  {u} - {v}")
+        if only_in_2:
+            print(f"Chỉ có ở {name2}:")
+            for u, v in sorted(only_in_2, key=lambda x: (int(x[0]), int(x[1]))):
+                print(f"  {u} - {v}")
+        print("=== KẾT THÚC SO SÁNH ===\n")
 
