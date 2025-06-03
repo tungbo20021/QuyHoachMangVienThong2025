@@ -173,7 +173,7 @@ def Mentor2_ISP(ListPosition, TrafficMatrix, MAX, C, w, RadiusRatio,NumNode, Lim
 
     # 4. Sau khi xử lý xong, duyệt các cặp hops = 1 còn lại trong hop_list
     for u, v, hops, traffic in hop_list_1hop:
-        print(f"Cặp backbone {u} - {v}, traffic {traffic_matrix.at[u,v]} 1 hop thuộc cây gốc => chỉ thêm liên kết .")
+        print(f"Cặp backbone {u} - {v}, traffic {traffic_matrix.at[u,v]} có số hops = 1, chỉ thêm dung lượng.")
         print(f"T({u},{v})={traffic_matrix.at[u, v]}")
         final_hop_list.append((u, v, traffic_matrix.at[u, v]))
         print("------------------------------------------")
@@ -593,7 +593,7 @@ def print_link_costs_with_n(backbone_links, direct_links, ListPosition, final_ho
         n_dict[(u, v)] = n
         n_dict[(v, u)] = n  # 2 chiều
 
-    print("\n=== BẢNG GIÁ LIÊN KẾT BACKBONE SAU MENTOR1 ===")
+    print("=== BẢNG GIÁ LIÊN KẾT BACKBONE SAU MENTOR1 ===")
     print(f"{'Node1':>6} {'Node2':>6} {'Traffic':>12} {'N':>10} {'Cost':>12}")
 
     # Giá cho backbone_links (có thể là direct hoặc không)
@@ -643,10 +643,11 @@ def calc_n_on_backbone_hops(backbone_links, ListBackbone, traffic_matrix, C):
 
     # Tạo dict lưu tổng traffic đi qua từng hop
     hop_traffic = {}
-    # Duyệt từng cặp backbone có traffic
+    # Duyệt từng cặp backbone có traffic (chỉ 1 chiều, i < j)
     for i in range(len(ListBackbone)):
         for j in range(i+1, len(ListBackbone)):
             u, v = ListBackbone[i], ListBackbone[j]
+            # Lấy traffic một chiều duy nhất
             traffic = traffic_matrix.at[u, v] if hasattr(traffic_matrix, 'at') else traffic_matrix[u][v]
             if traffic > 0:
                 try:
@@ -665,16 +666,15 @@ def calc_n_on_backbone_hops(backbone_links, ListBackbone, traffic_matrix, C):
     sum_cost = 0
     for (a, b), traffic in sorted(hop_traffic.items(), key=lambda x: (int(x[0][0]), int(x[0][1]))):
         n = math.ceil(traffic / C)
-        # Tính cost
         n1, n2 = node_map[a], node_map[b]
         dx = n1.get_position_x() - n2.get_position_x()
         dy = n1.get_position_y() - n2.get_position_y()
         dist = math.sqrt(dx*dx + dy*dy)
-        cost = round(0.3 * dist)*n
+        cost = round(0.3 * dist) * n
         sum_cost += cost
         print(f"{a:>6} {b:>6} {traffic:>10} {n:>6} {cost:>10}")
         printed.add(tuple(sorted((a, b))))
-    
+
     # In các link còn lại (không có traffic, n=1)
     for n1, n2 in backbone_links:
         key = tuple(sorted((n1.get_name(), n2.get_name())))
@@ -686,6 +686,5 @@ def calc_n_on_backbone_hops(backbone_links, ListBackbone, traffic_matrix, C):
             print(f"{n1.get_name():>6} {n2.get_name():>6} {0:>10} {1:>6} {cost:>10}")
             sum_cost += cost
     print(f"Total Cost: {sum_cost}")
-    print("=== KẾT THÚC ===\n")
     return hop_traffic
 
