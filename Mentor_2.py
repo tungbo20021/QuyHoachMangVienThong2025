@@ -95,21 +95,26 @@ def Mentor2_ISP(ListPosition, TrafficMatrix, MAX, C, w, RadiusRatio,NumNode, Lim
     final_hop_list = []
     direct_links = []
 
-    for u, v, traffic in special_traffic:
-        if u in ListBackbone and v in ListBackbone:
+    # Duyệt tất cả các cặp backbone (không lặp lại)
+    hop_list = []
+    for i in range(len(ListBackbone)):
+        u = ListBackbone[i]
+        for j in range(i+1, len(ListBackbone)):
+            v = ListBackbone[j]
             try:
                 hops = nx.shortest_path_length(backbone_graph, source=u, target=v)
+                traffic = traffic_matrix.at[u, v] if hasattr(traffic_matrix, 'at') else traffic_matrix[u][v]
                 hop_list.append((u, v, hops, traffic))
             except nx.NetworkXNoPath:
                 print(f"Không tồn tại đường đi từ {u} đến {v} trên backbone.")
-    
+    hop_list = [item for item in hop_list if item[3] > 0]
+    hop_list.sort(key=lambda x: x[2], reverse=True)
     # 1. Tách các cặp hops > 1 sang term_hop_list, còn lại là hops = 1
-    term_hop_list = [item for item in hop_list if item[2] > 1]
-    hop_list_1hop = [item for item in hop_list if item[2] == 1]
+    term_hop_list = [item for item in hop_list if item[2] > 1 and item[3] > 0]
+    hop_list_1hop = [item for item in hop_list if item[2] == 1 and item[3] > 0]
     # Sắp xếp theo số hops giảm dần
     term_hop_list.sort(key=lambda x: x[2], reverse=True)
     print(f"Term_hop_list trước khi xử lý: {term_hop_list}")
-    hop_list.sort(key=lambda x: x[2], reverse=True)
     # In ra kết quả đã sắp xếp
     for u, v, hops, traffic in hop_list:
         print(f"Cặp backbone {u} - {v}: số hops = {hops}, traffic = {traffic_matrix.at[u,v]}")    
@@ -313,53 +318,49 @@ def Mentor_compare(ListPosition, TrafficMatrix, MAX, C, w, RadiusRatio,NumNode, 
     print('special_traffic =', special_traffic)
     print("===================================================") 
     traffic_matrix = pd.DataFrame(0, index=ListBackbone, columns=ListBackbone)
-    print("Backbone")
-    for u, v, traffic in special_traffic:
-        if u in ListBackbone and v in ListBackbone:
-            # 1. Cộng traffic giữa backbone u và v
-            traffic_matrix.at[u, v] += traffic
-            traffic_matrix.at[v, u] += traffic  # Nếu 2 chiều
-            print (u,'-',v,'traffic',traffic)
-            # 2. Cộng thêm lưu lượng của các nút con thuộc nhóm u
-          # Khởi tạo traffic_matrix
-    # Khởi tạo traffic_matrix
-    traffic_matrix = pd.DataFrame(0, index=ListBackbone, columns=ListBackbone)
     traffic_matrix.style.set_properties(**{'text-align': 'center'}).set_table_styles(
-    [{'selector': 'th', 'props': [('text-align', 'center')]}]
-)
+        [{'selector': 'th', 'props': [('text-align', 'center')]}]
+    )
     # Tạo từ điển để tra cứu nhanh lưu lượng giữa các cặp
     special_traffic_dict = {(u, v): t for u, v, t in special_traffic}
     special_traffic_dict.update({(v, u): t for u, v, t in special_traffic})  # 2 chiều
 
-    # Duyệt từng cặp backbone (u, v)
-    for u, v, traffic in special_traffic:
-        if u in ListBackbone and v in ListBackbone:
-            traffic_matrix.at[u, v] += traffic
-            traffic_matrix.at[v, u] += traffic  # Nếu 2 chiều
-            print("-----------------------------------------------") 
-            print(f"{u}-{v} traffic {traffic}")
-            # Tìm group chứa u và v
-            group_u = next((g for g in ListMentor if g[0].get_name() == u), None)
-            group_v = next((g for g in ListMentor if g[0].get_name() == v), None)
-            if group_u is None or group_v is None:
-                continue
+    # Tạo map backbone name -> group
+    backbone_to_group = {group[0].get_name(): group for group in ListMentor if len(group) > 0}
 
-            # Duyệt từng cặp node con (node_u, node_v)
-            for node_u in group_u[1:]:  # bỏ backbone
+    # Duyệt tất cả các cặp backbone (không lặp lại)
+    for i in range(len(ListBackbone)):
+        u = ListBackbone[i]
+        group_u = backbone_to_group.get(u, [])
+        for j in range(i+1, len(ListBackbone)):
+            v = ListBackbone[j]
+            print("--------------------------------")
+            print(f"Tìm traffic giữa {u}-{v}")
+            group_v = backbone_to_group.get(v, [])
+            total_traffic = 0
+            # Duyệt từng cặp node con giữa hai backbone
+            for node_u in group_u:
                 id_u = node_u.get_name()
-                for node_v in group_v[1:]:
+                for node_v in group_v:
                     id_v = node_v.get_name()
                     if (id_u, id_v) in special_traffic_dict:
-                        traffic = special_traffic_dict[(id_u, id_v)]
-                        print(f"{id_u} <-> {id_v} traffic {traffic}")
-                        traffic_matrix.at[u, v] += traffic
-                        traffic_matrix.at[v, u] += traffic
+                        t = special_traffic_dict[(id_u, id_v)]
+                        print(f"Traffic {id_u} to {id_v}: {t}")
+                        total_traffic += t
+            # Cộng vào ma trận (cả 2 chiều)
+            traffic_matrix.at[u, v] += total_traffic
+            traffic_matrix.at[v, u] += total_traffic
+            if total_traffic > 0:
+                print(f"{u} <-> {v} traffic {total_traffic}")
 
-                # ListTraffic.append(temp_traffic)
     print("======= Ma trận lưu lượng giữa các nút backbone =======")
-    for u, v, traffic in special_traffic:
-        if u in ListBackbone and v in ListBackbone:
+
+    for i in range(len(ListBackbone)):
+        for j in range(i+1, len(ListBackbone)):
+            u = ListBackbone[i]
+            v = ListBackbone[j]
             print(f"{u} <-> {v} traffic {traffic_matrix.at[u, v]}")
+
     print("=======================================================")
     print(traffic_matrix)
     print("\nTính moment và xác định nút backbone trung tâm:")
@@ -410,21 +411,27 @@ def Mentor_compare(ListPosition, TrafficMatrix, MAX, C, w, RadiusRatio,NumNode, 
     final_hop_list = []
     direct_links = []
 
-    for u, v, traffic in special_traffic:
-        if u in ListBackbone and v in ListBackbone:
+
+    for i in range(len(ListBackbone)):
+        u = ListBackbone[i]
+        for j in range(i+1, len(ListBackbone)):
+            v = ListBackbone[j]
             try:
                 hops = nx.shortest_path_length(backbone_graph, source=u, target=v)
+                traffic = traffic_matrix.at[u, v] if hasattr(traffic_matrix, 'at') else traffic_matrix[u][v]
                 hop_list.append((u, v, hops, traffic))
             except nx.NetworkXNoPath:
                 print(f"Không tồn tại đường đi từ {u} đến {v} trên backbone.")
     
+    hop_list = [item for item in hop_list if item[3] > 0]
+    hop_list.sort(key=lambda x: x[2], reverse=True)
     # 1. Tách các cặp hops > 1 sang term_hop_list, còn lại là hops = 1
-    term_hop_list = [item for item in hop_list if item[2] > 1]
-    hop_list_1hop = [item for item in hop_list if item[2] == 1]
+    term_hop_list = [item for item in hop_list if item[2] > 1 and item[3] > 0]
+    hop_list_1hop = [item for item in hop_list if item[2] == 1 and item[3] > 0]
     # Sắp xếp theo số hops giảm dần
     term_hop_list.sort(key=lambda x: x[2], reverse=True)
     print(f"Term_hop_list trước khi xử lý: {term_hop_list}")
-    hop_list.sort(key=lambda x: x[2], reverse=True)
+
     # In ra kết quả đã sắp xếp
     for u, v, hops, traffic in hop_list:
         print(f"Cặp backbone {u} - {v}: số hops = {hops}, traffic = {traffic_matrix.at[u,v]}")    
@@ -517,7 +524,7 @@ def Mentor_compare(ListPosition, TrafficMatrix, MAX, C, w, RadiusRatio,NumNode, 
             if n_new != n_old:
                 print(f"Liên kết {u}-{v}: n cũ = {n_old}, n mới = {n_new} => ĐÃ THAY ĐỔI")
             else:
-                print(f"Liên kết {u}-{v}: n cũ = {n_old}, n mới = {n_new} => Không đổi")
+                print(f"Liên kết {u}-{v}: n cũ = {n_old}, n mới = {n_new}")
         else:
             print(f"Liên kết {u}-{v}: n mới = {n_new} (không có ở lần chạy trước)")
     compare_direct_link_transitions(direct_links_before, direct_links)    
@@ -645,11 +652,11 @@ def calc_n_on_backbone_hops(backbone_links, ListBackbone, traffic_matrix, C):
 
     # Tạo dict lưu tổng traffic đi qua từng hop
     hop_traffic = {}
-    # Duyệt từng cặp backbone có traffic (chỉ 1 chiều, i < j)
+    hop_detail = {}  # Lưu chi tiết các cặp đi qua từng hop
+
     for i in range(len(ListBackbone)):
         for j in range(i+1, len(ListBackbone)):
             u, v = ListBackbone[i], ListBackbone[j]
-            # Lấy traffic một chiều duy nhất
             traffic = traffic_matrix.at[u, v] if hasattr(traffic_matrix, 'at') else traffic_matrix[u][v]
             if traffic > 0:
                 try:
@@ -658,8 +665,22 @@ def calc_n_on_backbone_hops(backbone_links, ListBackbone, traffic_matrix, C):
                         a, b = path[k], path[k+1]
                         key = tuple(sorted((a, b)))
                         hop_traffic[key] = hop_traffic.get(key, 0) + traffic
+                        # Lưu chi tiết
+                        if key not in hop_detail:
+                            hop_detail[key] = []
+                        hop_detail[key].append((u, v, traffic))
                 except nx.NetworkXNoPath:
                     continue
+
+    # In chi tiết từng hop
+    print("\n=== TRAFFIC TRÊN TỪNG HOP CỦA CÂY BACKBONE ===")
+    for (a, b) in sorted(hop_traffic.keys(), key=lambda x: (int(x[0]), int(x[1]))):
+        print(f"Đang xét hop {a}-{b}")
+        print("  Các cặp backbone đi qua hop này:")
+        for u, v, traffic in hop_detail[(a, b)]:
+            print(f"    + {u}-{v} (traffic={traffic})")
+        print(f"Tổng traffic = {hop_traffic[(a, b)]}")
+        print("------------------------------------------")
 
     # In kết quả cho các hop có traffic
     print("\n=== SỐ ĐƯỜNG TRÊN TỪNG HOP CỦA CÂY BACKBONE ===")
@@ -712,19 +733,21 @@ def compare_backbone_links(links1, links2, traffic_matrix_before, traffic_matrix
                 print(f"  {u} - {v}")
         print("=== KẾT THÚC SO SÁNH ===\n")
 
-    # So sánh traffic trên từng cặp backbone trong special_traffic
+    # So sánh traffic trên từng cặp backbone trong traffic_matrix
     print("=== SO SÁNH TRAFFIC TRÊN TỪNG CẶP BACKBONE ===")
     changed = False
-    for u, v, _ in special_traffic:
-        if (u in traffic_matrix_before.index and v in traffic_matrix_before.columns and
-            u in traffic_matrix_after.index and v in traffic_matrix_after.columns):
-            t_before = traffic_matrix_before.at[u, v]
-            t_after = traffic_matrix_after.at[u, v]
-            if t_before != t_after:
-                print(f"{u} <-> {v} traffic cũ = {t_before}, traffic mới = {t_after} => ĐÃ THAY ĐỔI")
-                changed = True
-            else:
-                print(f"{u} <-> {v} traffic = {t_after} => Không đổi")
+    for i in range(len(traffic_matrix_before.index)):
+        for j in range(i+1, len(traffic_matrix_before.columns)):
+            u = traffic_matrix_before.index[i]
+            v = traffic_matrix_before.columns[j]
+            if (u in traffic_matrix_after.index and v in traffic_matrix_after.columns):
+                t_before = traffic_matrix_before.at[u, v]
+                t_after = traffic_matrix_after.at[u, v]
+                if t_before != t_after:
+                    print(f"{u} <-> {v} traffic cũ = {t_before}, traffic mới = {t_after} => ĐÃ THAY ĐỔI")
+                    changed = True
+                else:
+                    print(f"{u} <-> {v} traffic = {t_after}")
     if not changed:
         print("Không có cặp backbone nào thay đổi traffic.")
     print("=== KẾT THÚC SO SÁNH TRAFFIC ===\n")

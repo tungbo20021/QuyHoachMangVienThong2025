@@ -244,6 +244,8 @@ def MenTor(ListPosition,TrafficMatrix,MAX,C,w,RadiusRatio,NumNode,Limit,DeBug):
             special_traffic.append((i, i + 91, 4))
         if i + 99 < NumNode:
             special_traffic.append((i, i + 99, 6))
+        if i + 21 < NumNode:
+            special_traffic.append((i, i + 21, 1))
 
     # Điều kiện thủ công
     special_traffic += [
@@ -270,54 +272,51 @@ def MenTor(ListPosition,TrafficMatrix,MAX,C,w,RadiusRatio,NumNode,Limit,DeBug):
     # ======= TẠO MA TRẬN GIAO CẮT =======
     # Tạo DataFrame lưu lượng giữa các nút backbone
     # Khởi tạo traffic_matrix
-    traffic_matrix = pd.DataFrame(0, index=ListBackbone, columns=ListBackbone)
-    print("Backbone")
-    for u, v, traffic in special_traffic:
-        if u in ListBackbone and v in ListBackbone:
-            # 1. Cộng traffic giữa backbone u và v
-            traffic_matrix.at[u, v] += traffic
-            traffic_matrix.at[v, u] += traffic  # Nếu 2 chiều
-            print (u,'-',v,'traffic',traffic)
-            # 2. Cộng thêm lưu lượng của các nút con thuộc nhóm u
-          # Khởi tạo traffic_matrix
-    # Khởi tạo traffic_matrix
+# Khởi tạo traffic_matrix
     traffic_matrix = pd.DataFrame(0, index=ListBackbone, columns=ListBackbone)
     traffic_matrix.style.set_properties(**{'text-align': 'center'}).set_table_styles(
-    [{'selector': 'th', 'props': [('text-align', 'center')]}]
-)
+        [{'selector': 'th', 'props': [('text-align', 'center')]}]
+    )
     # Tạo từ điển để tra cứu nhanh lưu lượng giữa các cặp
     special_traffic_dict = {(u, v): t for u, v, t in special_traffic}
     special_traffic_dict.update({(v, u): t for u, v, t in special_traffic})  # 2 chiều
 
-    # Duyệt từng cặp backbone (u, v)
-    for u, v, traffic in special_traffic:
-        if u in ListBackbone and v in ListBackbone:
-            traffic_matrix.at[u, v] += traffic
-            traffic_matrix.at[v, u] += traffic  # Nếu 2 chiều
-            print("-----------------------------------------------") 
-            print(f"{u}-{v} traffic {traffic}")
-            # Tìm group chứa u và v
-            group_u = next((g for g in ListMentor if g[0].get_name() == u), None)
-            group_v = next((g for g in ListMentor if g[0].get_name() == v), None)
-            if group_u is None or group_v is None:
-                continue
+    # Tạo map backbone name -> group
+    backbone_to_group = {group[0].get_name(): group for group in ListMentor if len(group) > 0}
 
-            # Duyệt từng cặp node con (node_u, node_v)
-            for node_u in group_u[1:]:  # bỏ backbone
+    # Duyệt tất cả các cặp backbone (không lặp lại)
+    for i in range(len(ListBackbone)):
+        u = ListBackbone[i]
+        group_u = backbone_to_group.get(u, [])
+        for j in range(i+1, len(ListBackbone)):
+            v = ListBackbone[j]
+            print("--------------------------------")
+            print(f"Tìm traffic giữa {u}-{v}")
+            group_v = backbone_to_group.get(v, [])
+            total_traffic = 0
+            # Duyệt từng cặp node con giữa hai backbone
+            for node_u in group_u:
                 id_u = node_u.get_name()
-                for node_v in group_v[1:]:
+                for node_v in group_v:
                     id_v = node_v.get_name()
                     if (id_u, id_v) in special_traffic_dict:
-                        traffic = special_traffic_dict[(id_u, id_v)]
-                        print(f"{id_u} <-> {id_v} traffic {traffic}")
-                        traffic_matrix.at[u, v] += traffic
-                        traffic_matrix.at[v, u] += traffic
+                        t = special_traffic_dict[(id_u, id_v)]
+                        print(f"Traffic {id_u} to {id_v}: {t}")
+                        total_traffic += t
+            # Cộng vào ma trận (cả 2 chiều)
+            traffic_matrix.at[u, v] += total_traffic
+            traffic_matrix.at[v, u] += total_traffic
+            if total_traffic > 0:
+                print(f"{u} <-> {v} traffic {total_traffic}")
 
-                # ListTraffic.append(temp_traffic)
     print("======= Ma trận lưu lượng giữa các nút backbone =======")
-    for u, v, traffic in special_traffic:
-        if u in ListBackbone and v in ListBackbone:
+
+    for i in range(len(ListBackbone)):
+        for j in range(i+1, len(ListBackbone)):
+            u = ListBackbone[i]
+            v = ListBackbone[j]
             print(f"{u} <-> {v} traffic {traffic_matrix.at[u, v]}")
+
     print("=======================================================")
     print(traffic_matrix)
     print("\nTính moment và xác định nút backbone trung tâm:")
@@ -349,8 +348,6 @@ def MenTor(ListPosition,TrafficMatrix,MAX,C,w,RadiusRatio,NumNode,Limit,DeBug):
 
     print(f"\n==> Nút backbone trung tâm là: {center_node.get_name()} với moment = {min_moment:.4f}")
 
-
-    NodesExcel.backbones_to_excel("nodes_inf.xlsx", ListMentor)
     Node.matplot_mentor(ListMentor,MAX)
 
     # Node.plt.show()
