@@ -203,7 +203,7 @@ def Mentor2_ISP(ListPosition, TrafficMatrix, MAX, C, w, RadiusRatio,NumNode, Lim
     #     print(f"Tổng cost Prim_Dijkstra (Tổng khoảng cách Euclid các liên kết backbone): {total_cost}")
     direct_links_before = direct_links.copy()
     print("=== KẾT THÚC TÍNH TOÁN LIÊN KẾT TRỰC TIẾP ===")
-    return  ListMentor,ListBackbone,special_traffic, traffic_matrix, n_old_dict,direct_links_before,backbone_links_compare
+    return  ListMentor,ListBackbone,special_traffic, traffic_matrix,traffic_matrix_compare, n_old_dict,direct_links_before,backbone_links_compare
 
 
 def plot_backbone(ListPosition, _list_mentor, backbone_links, MAX, direct_links,done,final_hop_list,compare):
@@ -297,7 +297,7 @@ def get_special_traffic(u, v, special_traffic):
     return 0
 
 def Mentor_compare(ListPosition, TrafficMatrix, MAX, C, w, RadiusRatio,NumNode, Limit, umin, alpha,
-                    debug,ListMentor, ListBackbone, special_traffic, traffic_matrix,n_old_dict,direct_links_before,backbone_links_compare):
+                    debug,ListMentor, ListBackbone, special_traffic, traffic_matrix,traffic_matrix_compare,n_old_dict,direct_links_before,backbone_links_compare):
     # 1. Tính Mentor 1 để lấy các nhóm backbone và truy nhập
     print("===================================================") 
     print("===================================================") 
@@ -398,7 +398,7 @@ def Mentor_compare(ListPosition, TrafficMatrix, MAX, C, w, RadiusRatio,NumNode, 
     prim_links = prim_dijkstra_backbone_links(ListPosition, backbone_nodes, ListMentor, center_node, alpha, MAX)
     backbone_links = prim_links.copy()
     direct_links = []
-    compare_backbone_links(backbone_links_compare, backbone_links, name1="Mentor2", name2="Mentor_compare")
+    compare_backbone_links(backbone_links_compare, backbone_links,traffic_matrix_compare,traffic_matrix,special_traffic, name1="Mentor2", name2="Mentor_compare")
     plot_backbone(ListPosition,ListMentor, prim_links, MAX,None,None,None,None)
 
     # Tạo đồ thị backbone từ các liên kết backbone
@@ -687,9 +687,9 @@ def calc_n_on_backbone_hops(backbone_links, ListBackbone, traffic_matrix, C):
     print(f"Total Cost: {sum_cost}")
     return hop_traffic
 
-def compare_backbone_links(links1, links2, name1="Mentor2", name2="Mentor_compare"):
+def compare_backbone_links(links1, links2, traffic_matrix_before, traffic_matrix_after, special_traffic, name1="Mentor2", name2="Mentor_compare"):
     """
-    So sánh hai danh sách backbone_links (dạng [(node1, node2), ...]) và in ra sự khác biệt.
+    So sánh hai danh sách backbone_links và traffic trên từng cặp backbone.
     Nếu giống nhau hoàn toàn thì in "cây backbone không đổi".
     """
     set1 = set(tuple(sorted((n1.get_name(), n2.get_name()))) for n1, n2 in links1)
@@ -700,7 +700,6 @@ def compare_backbone_links(links1, links2, name1="Mentor2", name2="Mentor_compar
 
     if not only_in_1 and not only_in_2:
         print("CÂY BACKBONE KHÔNG ĐỔI")
-        ("================================")
     else:
         print("\n=== SO SÁNH BACKBONE LINKS ===")
         if only_in_1:
@@ -712,4 +711,21 @@ def compare_backbone_links(links1, links2, name1="Mentor2", name2="Mentor_compar
             for u, v in sorted(only_in_2, key=lambda x: (int(x[0]), int(x[1]))):
                 print(f"  {u} - {v}")
         print("=== KẾT THÚC SO SÁNH ===\n")
+
+    # So sánh traffic trên từng cặp backbone trong special_traffic
+    print("=== SO SÁNH TRAFFIC TRÊN TỪNG CẶP BACKBONE ===")
+    changed = False
+    for u, v, _ in special_traffic:
+        if (u in traffic_matrix_before.index and v in traffic_matrix_before.columns and
+            u in traffic_matrix_after.index and v in traffic_matrix_after.columns):
+            t_before = traffic_matrix_before.at[u, v]
+            t_after = traffic_matrix_after.at[u, v]
+            if t_before != t_after:
+                print(f"{u} <-> {v} traffic cũ = {t_before}, traffic mới = {t_after} => ĐÃ THAY ĐỔI")
+                changed = True
+            else:
+                print(f"{u} <-> {v} traffic = {t_after} => Không đổi")
+    if not changed:
+        print("Không có cặp backbone nào thay đổi traffic.")
+    print("=== KẾT THÚC SO SÁNH TRAFFIC ===\n")
 
